@@ -118,7 +118,7 @@ class UnzipWalkTestCase(unittest.TestCase):
         except OSError as ex:  # pragma: no cover  (b/c only Windows)
             print(f"Skipping symlink test ({ex})", file=sys.stderr)
         if hasattr(os, 'mkfifo'):
-            os.mkfifo(testdir/'xy.fifo')
+            os.mkfifo(testdir/'xy.fifo')  # pyright: ignore [reportAttributeAccessIssue]
             self.expect_all.append( ( (Path("xy.fifo"),), None, FileType.OTHER ) )
         else:  # pragma: no cover  (b/c only Windows)
             print("Skipping fifo test (no mkfifo)", file=sys.stderr)
