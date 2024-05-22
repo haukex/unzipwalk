@@ -207,14 +207,14 @@ def unzipwalk(paths :AnyPaths) -> Generator[UnzipWalkResult, None, None]:
     for p in p_paths: p.resolve(strict=True)  # force FileNotFound errors early
     for p in chain.from_iterable( pa.rglob('*') if pa.is_dir() else (pa,) for pa in p_paths ):
         if p.is_symlink():
-            yield UnzipWalkResult(names=(p,), typ=FileType.SYMLINK).validate()
+            yield UnzipWalkResult(names=(p,), typ=FileType.SYMLINK).validate()  # pragma: no cover  (doesn't run on Windows)
         elif p.is_dir():
             yield UnzipWalkResult(names=(p,), typ=FileType.DIR).validate()
         elif p.is_file():
             with p.open('rb') as fh:
                 yield from ( r.validate() for r in _proc_file((p,), fh) )
         else:
-            yield UnzipWalkResult(names=(p,), typ=FileType.OTHER).validate()
+            yield UnzipWalkResult(names=(p,), typ=FileType.OTHER).validate()  # pragma: no cover  (doesn't run on Windows)
 
 def _arg_parser():
     parser = argparse.ArgumentParser('unzipwalk', description='Recursively walk into directories and archives',

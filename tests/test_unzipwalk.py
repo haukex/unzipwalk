@@ -112,15 +112,16 @@ class UnzipWalkTestCase(unittest.TestCase):
         self.prev_dir = os.getcwd()
         os.chdir( testdir )
         self.expect_all :list[ResultType] = list( deepcopy( EXPECT ) )
+        #TODO Later: Use a coverage plugin for OS-dependent coverage pragmas
         try:
             (testdir/'baz.zip').symlink_to('more.zip')
-            self.expect_all.append( ( (Path("baz.zip"),), None, FileType.SYMLINK ) )
-        except OSError as ex:  # pragma: no cover  (b/c only Windows)
+            self.expect_all.append( ( (Path("baz.zip"),), None, FileType.SYMLINK ) )  # pragma: no cover  (doesn't run on Windows)
+        except OSError as ex:  # pragma: no cover  (only runs on Windows)
             print(f"Skipping symlink test ({ex})", file=sys.stderr)
-        if hasattr(os, 'mkfifo'):
+        if hasattr(os, 'mkfifo'):  # pragma: no cover  (doesn't run on Windows)
             os.mkfifo(testdir/'xy.fifo')  # pyright: ignore [reportAttributeAccessIssue]
             self.expect_all.append( ( (Path("xy.fifo"),), None, FileType.OTHER ) )
-        else:  # pragma: no cover  (b/c only Windows)
+        else:  # pragma: no cover  (only runs on Windows)
             print("Skipping fifo test (no mkfifo)", file=sys.stderr)
         self.expect_all.sort()
 
