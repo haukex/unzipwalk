@@ -9,6 +9,7 @@ version = "1.0.0"
 authors = [ { name="Hauke D", email="haukex@zero-g.net" } ]
 readme = "README.md"
 requires-python = ">=3.9"
+dynamic = ["dependencies"]
 # https://pypi.org/classifiers/
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -21,12 +22,17 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Operating System :: POSIX",
     "Operating System :: Unix",
+    "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS :: MacOS X",
+    "Topic :: Software Development :: Libraries",
     "Topic :: System :: Archiving",
 ]
 
 [tool.setuptools]
 packages = ["unzipwalk"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [project.scripts]
 unzipwalk = "unzipwalk:main"
