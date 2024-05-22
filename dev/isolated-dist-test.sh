@@ -15,11 +15,10 @@ cd "$( dirname "${BASH_SOURCE[0]}" )"/..
 TEMPDIR="$( mktemp --directory )"
 trap 'set +e; popd; rm -rf "$TEMPDIR"' EXIT
 
-rsync -a requirements.txt tests "$TEMPDIR" --exclude=__pycache__
+rsync -a tests "$TEMPDIR" --exclude=__pycache__
 
 pushd "$TEMPDIR"
 python3 -m venv venv
 venv/bin/python3 -m pip -q install --upgrade pip
-venv/bin/python3 -m pip -q install -r requirements.txt
 venv/bin/python3 -m pip -q install "$DISTFILE"
 venv/bin/python3 -Im unittest -v
