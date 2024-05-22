@@ -1,0 +1,31 @@
+{
+    "files.eol": "\n",
+    "files.trimTrailingWhitespace": true,
+    "editor.rulers": [ 150 ],  // keep in sync with pyproject.toml
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": true,
+    "python.testing.unittestArgs": [ "-v", "-s", "${workspaceFolder}", ],
+    "python.analysis.typeCheckingMode": "strict", // the rest of the pyright settings are in pyproject.toml
+    "pylint.importStrategy": "fromEnvironment",
+    "pylint.args": [ "--rcfile=${workspaceFolder}/pyproject.toml", ],
+    "pylint.severity": {
+        // raised the default severity so they are easier to find
+        "convention": "Warning",
+        "refactor": "Warning",
+        "info": "Warning"
+    },
+    "flake8.importStrategy": "fromEnvironment",
+    "flake8.args": [ "--toml-config=${workspaceFolder}/pyproject.toml", ],
+    "mypy-type-checker.importStrategy": "fromEnvironment",
+    "mypy-type-checker.reportingScope": "workspace",
+    "mypy-type-checker.args": [ "--config-file", "${workspaceFolder}/pyproject.toml", ],
+    "indentRainbow.ignoreErrorLanguages": [
+        "python",
+        "markdown"
+    ],
+    "cSpell.ignoreWords": [
+        "igbpyutils",
+        "unzipwalk"
+    ],
+}
+/* vim: set filetype=javascript ts=4 sw=4 expandtab : */

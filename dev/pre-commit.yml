@@ -1,0 +1,36 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.5.0
+  hooks:
+  - id: check-added-large-files
+  - id: check-byte-order-marker
+  - id: check-case-conflict
+  - id: check-docstring-first
+  - id: check-executables-have-shebangs
+  # The following doesn't work for some Perl files like Makefile.PL
+  #- id: check-shebang-scripts-are-executable
+  - id: check-merge-conflict
+  - id: check-symlinks
+  - id: destroyed-symlinks
+  - id: check-vcs-permalinks
+  - id: check-xml
+  - id: check-yaml
+  # Prefer JSON5 (below) over the following
+  #- id: check-json
+  - id: check-toml
+  - id: mixed-line-ending
+    args: [--fix=no]
+- repo: https://github.com/pre-commit/pygrep-hooks
+  rev: v1.10.0
+  hooks:
+  - id: python-check-blanket-noqa
+  - id: python-check-blanket-type-ignore
+  - id: python-use-type-annotations
+  - id: rst-backticks
+  - id: rst-directive-colons
+  - id: rst-inline-touching-normal
+  - id: text-unicode-replacement-char
+- repo: https://gitlab.com/bmares/check-json5
+  rev: v1.0.0
+  hooks:
+  - id: check-json5

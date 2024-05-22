@@ -1,0 +1,4 @@
+tomli == 2.0.1
+sphinx == 7.3.7
+sphinx-markdown-builder == 0.6.6
+types-docutils == 0.21.0.20240423
