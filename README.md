@@ -16,7 +16,7 @@ For example, to read all CSV files in the current directory and below, including
 >>> from io import TextIOWrapper
 >>> import csv
 >>> for result in unzipwalk('.'):
-...     if result.typ==FileType.FILE and result.names[-1].suffix.lower() == '.csv':
+...     if result.typ==FileType.FILE and result.names[-1].suffix.lower()=='.csv':
 ...         print(repr(result.names))
 ...         with TextIOWrapper(result.hnd, encoding='UTF-8', newline='') as handle:
 ...             csv_rd = csv.reader(handle, strict=True)
@@ -133,9 +133,9 @@ optional arguments:
   -c ALGO, --checksum ALGO
                         generate a checksum for each file
 
-Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, sha1, sha224,
-sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512, sha512_224,
-sha512_256, shake_128, shake_256, sm3
+Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, ripemd160,
+sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
+sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.
