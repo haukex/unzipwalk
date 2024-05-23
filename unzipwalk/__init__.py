@@ -15,7 +15,7 @@ For example, to read all CSV files in the current directory and below, including
     >>> from io import TextIOWrapper
     >>> import csv
     >>> for result in unzipwalk('.'):
-    ...     if result.typ==FileType.FILE and result.names[-1].suffix.lower() == '.csv':
+    ...     if result.typ==FileType.FILE and result.names[-1].suffix.lower()=='.csv':
     ...         print(repr(result.names))
     ...         with TextIOWrapper(result.hnd, encoding='UTF-8', newline='') as handle:
     ...             csv_rd = csv.reader(handle, strict=True)
