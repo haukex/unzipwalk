@@ -99,7 +99,14 @@ EXPECT :tuple[ResultType, ...] = (
 )
 
 def load_tests(_loader, tests, _ignore):
-    tests.addTests(doctest.DocTestSuite(uut))
+    globs :dict = {}
+    def doctest_setup(_t :doctest.DocTest):
+        globs['_prev_dir'] = os.getcwd()
+        os.chdir( Path(__file__).parent/'doctest_wd' )
+    def doctest_teardown(_t :doctest.DocTest):
+        os.chdir( globs['_prev_dir'] )
+        del globs['_prev_dir']
+    tests.addTests(doctest.DocTestSuite(uut, setUp=doctest_setup, tearDown=doctest_teardown, globs=globs))
     return tests
 
 class UnzipWalkTestCase(unittest.TestCase):

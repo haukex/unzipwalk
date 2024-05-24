@@ -8,6 +8,28 @@ together with binary file handles (file objects) for reading the files.
 Currently supported are ZIP, tar, tgz, and gz compressed files.
 File types are detected based on their extensions.
 
+    >>> from unzipwalk import unzipwalk
+    >>> for result in unzipwalk('.'):
+    ...     print(f"{[ str(name) for name in result.names ]} {result.typ.name}")
+    ...     if result.hnd:
+    ...         # could use result.hnd.read() here, or for line-by-line:
+    ...         for line in result.hnd:
+    ...             pass  # do something interesting with the data here
+    ['bar.zip'] ARCHIVE
+    ['bar.zip', 'bar.txt'] FILE
+    ['bar.zip', 'test.tar.gz'] ARCHIVE
+    ['bar.zip', 'test.tar.gz', 'test'] DIR
+    ['bar.zip', 'test.tar.gz', 'test/cool.txt.gz'] ARCHIVE
+    ['bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'test/cool.txt'] FILE
+    ['bar.zip', 'test.tar.gz', 'hello.csv'] FILE
+    ['foo.txt'] FILE
+
+*Note* that :func:`unzipwalk` automatically closes files as it goes from file to file.
+This means that you must use the handles as soon as you get them from the generator -
+something as seemingly simple as ``sorted(unzipwalk('.'))`` will cause the code above to fail,
+because all files will have been opened and closed during the call to :func:`sorted`
+and no longer be available in the body of the loop.
+
 The yielded file handles can be wrapped in :class:`io.TextIOWrapper` to read them as text files.
 For example, to read all CSV files in the current directory and below, including within compressed files:
 
@@ -16,13 +38,14 @@ For example, to read all CSV files in the current directory and below, including
     >>> import csv
     >>> for result in unzipwalk('.'):
     ...     if result.typ==FileType.FILE and result.names[-1].suffix.lower()=='.csv':
-    ...         print(repr(result.names))
+    ...         print([ str(name) for name in result.names ])
     ...         with TextIOWrapper(result.hnd, encoding='UTF-8', newline='') as handle:
     ...             csv_rd = csv.reader(handle, strict=True)
     ...             for row in csv_rd:
-    ...                 print(repr(row))               # doctest:+ELLIPSIS
-    (...)
-    [...]
+    ...                 print(repr(row))
+    ['bar.zip', 'test.tar.gz', 'hello.csv']
+    ['Id', 'Name', 'Address']
+    ['42', 'Hello', 'World']
 
 Members
 -------
