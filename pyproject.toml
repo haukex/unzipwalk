@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "unzipwalk"
 description = "Recursively walk into directories and archives"
-version = "1.1.0"
+version = "1.2.0"
 authors = [ { name="Hauke D", email="haukex@zero-g.net" } ]
 readme = "README.md"
 requires-python = ">=3.9"
@@ -40,6 +40,7 @@ unzipwalk = "unzipwalk:main"
 [project.urls]
 "Repository" = "https://github.com/haukex/unzipwalk"
 "Bug Tracker" = "https://github.com/haukex/unzipwalk/issues"
+"Changelog" = "https://github.com/haukex/unzipwalk/blob/main/CHANGELOG.md"
 
 
 # Individual lines can be ignored with:

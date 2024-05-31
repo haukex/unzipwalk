@@ -1,10 +1,10 @@
 Changelog for unzipwalk
 =======================
 
-1.2.0 - *unreleased*
---------------------
+1.2.0 - Fri, May 31 2024
+------------------------
 
-- ...
+- Added `matcher` argument to `unzipwalk()` and corresponding `--exclude` CLI option.
 
 1.1.0 - Fri, May 31 2024
 ------------------------

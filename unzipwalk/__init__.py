@@ -106,9 +106,10 @@ from gzip import GzipFile
 from tarfile import TarFile
 from zipfile import ZipFile
 from itertools import chain
+from fnmatch import fnmatch
 from contextlib import contextmanager
-from collections.abc import Generator, Sequence
 from pathlib import PurePosixPath, PurePath, Path
+from collections.abc import Generator, Sequence, Callable
 from typing import Optional, cast, Protocol, Literal, BinaryIO, NamedTuple, runtime_checkable, Union
 from igbpyutils.file import AnyPaths, to_Paths, Filename
 import igbpyutils.error
@@ -222,6 +223,9 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
     If the last file in the list of files is an archive file, then it won't be decompressed,
     instead you'll be able to read the archive's raw compressed data from the handle.
 
+    In this example, we open a gzip-compressed file, stored inside a tgz archive, which
+    in turn is stored in a Zip file:
+
     >>> from unzipwalk import recursive_open
     >>> with recursive_open(('bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'test/cool.txt'), encoding='UTF-8') as fh:
     ...     print(fh.read())# doctest: +NORMALIZE_WHITESPACE
@@ -238,13 +242,16 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
             else:
                 yield cast(ReadOnlyBinary, inner)
 
-def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO) -> Generator[UnzipWalkResult, None, None]:
+FilterType = Callable[[Sequence[PurePath]], bool]
+
+def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *, matcher :Optional[FilterType]) -> Generator[UnzipWalkResult, None, None]:
     bl = fns[-1].name.lower()
     if bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
         yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
         with TarFile.open(fileobj=fh) as tf:
             for ti in tf.getmembers():
                 new_names = (*fns, PurePosixPath(ti.name))
+                if matcher is not None and not matcher(new_names): continue
                 # for ti.type see e.g.: https://github.com/python/cpython/blob/v3.12.3/Lib/tarfile.py#L88
                 if ti.issym():
                     yield UnzipWalkResult(names=new_names, typ=FileType.SYMLINK)
@@ -258,7 +265,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO) -> Generator[UnzipWalkRe
                         assert fh2.readable()  # expected by ReadOnlyBinary
                         # NOTE type checker thinks fh2 is typing.IO[bytes], but it's actually a tarfile.ExFileObject,
                         # which is an io.BufferedReader subclass - which should be safe to cast to BinaryIO, I think.
-                        yield from _proc_file(new_names, cast(BinaryIO, fh2))
+                        yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher)
                 else: yield UnzipWalkResult(names=new_names, typ=FileType.OTHER)
     elif bl.endswith('.zip'):
         yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
@@ -267,6 +274,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO) -> Generator[UnzipWalkRe
                 # Note the ZIP specification requires forward slashes for path separators.
                 # https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
                 new_names = (*fns, PurePosixPath(zi.filename))
+                if matcher is not None and not matcher(new_names): continue
                 # Manually detect symlinks in ZIP files (should be rare anyway)
                 # e.g. from zipfile.py: z_info.external_attr = (st.st_mode & 0xFFFF) << 16
                 # we're not going to worry about other special file types in ZIP files
@@ -279,43 +287,51 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO) -> Generator[UnzipWalkRe
                         assert fh2.readable()  # expected by ReadOnlyBinary
                         # NOTE type checker thinks fh2 is typing.IO[bytes], but it's actually a zipfile.ZipExtFile,
                         # which is an io.BufferedIOBase subclass - which should be safe to cast to BinaryIO, I think.
-                        yield from _proc_file(new_names, cast(BinaryIO, fh2))
+                        yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher)
     elif bl.endswith('.gz'):
         yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
+        new_names = (*fns, fns[-1].with_suffix(''))
+        if matcher is not None and not matcher(new_names): return
         with GzipFile(fileobj=fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
             assert fh2.readable()  # expected by ReadOnlyBinary
             # NOTE casting GzipFile to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
             # but testing seems to show it's ok...
-            yield from _proc_file((*fns, fns[-1].with_suffix('')), cast(BinaryIO, fh2))
+            yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher)
     else:
         assert fh.readable()  # expected by ReadOnlyBinary
         # The following cast is safe since ReadOnlyBinary is a subset of the interfaces.
         yield UnzipWalkResult(names=fns, typ=FileType.FILE, hnd=cast(ReadOnlyBinary, fh))
 
-def unzipwalk(paths :AnyPaths) -> Generator[UnzipWalkResult, None, None]:
+def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None) -> Generator[UnzipWalkResult, None, None]:
     """This generator recursively walks into directories and compressed files and yields named tuples of type :class:`UnzipWalkResult`.
 
-    :param paths: A filename or iterable of filenames."""
+    :param paths: A filename or iterable of filenames.
+    :param matcher: When you provide this optional argument, it must be a callable that accepts a sequence of paths
+        as its only argument, and returns a boolean value whether this filename should be further processed or not."""
     p_paths = tuple(to_Paths(paths))
     for p in p_paths: p.resolve(strict=True)  # force FileNotFound errors early
     for p in chain.from_iterable( pa.rglob('*') if pa.is_dir() else (pa,) for pa in p_paths ):
+        if matcher is not None and not matcher((p,)): continue
         if p.is_symlink():
             yield UnzipWalkResult(names=(p,), typ=FileType.SYMLINK).validate()  # pragma: no cover  (doesn't run on Windows)
         elif p.is_dir():
             yield UnzipWalkResult(names=(p,), typ=FileType.DIR).validate()
         elif p.is_file():
             with p.open('rb') as fh:
-                yield from ( r.validate() for r in _proc_file((p,), fh) )
+                yield from ( r.validate() for r in _proc_file((p,), fh, matcher=matcher) )
         else:
             yield UnzipWalkResult(names=(p,), typ=FileType.OTHER).validate()  # pragma: no cover  (doesn't run on Windows)
 
 def _arg_parser():
     parser = argparse.ArgumentParser('unzipwalk', description='Recursively walk into directories and archives',
-        epilog=f"Possible values for ALGO: {', '.join(sorted(hashlib.algorithms_available))}")
+        epilog="* Note --exclude currently only matches against the final name in the sequence, excluding path names, "
+        "but this interface may change in future versions. For more control, use the library instead of this command-line tool.\n\n"
+        f"** Possible values for ALGO: {', '.join(sorted(hashlib.algorithms_available))}")
     parser.add_argument('-a','--all-files', help="also list dirs, symlinks, etc.", action="store_true")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-d','--dump', help="also dump file contents", action="store_true")
-    group.add_argument('-c','--checksum', help="generate a checksum for each file", choices=hashlib.algorithms_available, metavar="ALGO")
+    group.add_argument('-c','--checksum', help="generate a checksum for each file**", choices=hashlib.algorithms_available, metavar="ALGO")
+    parser.add_argument('-e', '--exclude', help="filename globs to exclude*", action="append", default=[])
     parser.add_argument('paths', metavar='PATH', help='paths to process (default is current directory)', nargs='*')
     return parser
 
@@ -323,7 +339,9 @@ def main(argv=None):
     igbpyutils.error.init_handlers()
     parser = _arg_parser()
     args = parser.parse_args(argv)
-    for result in unzipwalk( args.paths if args.paths else Path() ):
+    def matcher(paths :Sequence[PurePath]) -> bool:
+        return not any( fnmatch(paths[-1].name, pat) for pat in args.exclude )
+    for result in unzipwalk( args.paths if args.paths else Path(), matcher=matcher ):
         names = tuple( str(n) for n in result.names )
         if (args.dump or args.checksum) and result.typ==FileType.FILE:
             assert result.hnd is not None  # make type checker happy; we know this is true because we checked it's a file

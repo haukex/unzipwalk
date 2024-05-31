@@ -60,12 +60,14 @@ For example, to read all CSV files in the current directory and below, including
 
 <a id="function-unzipwalk"></a>
 
-### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)])
+### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath)]], [bool](https://docs.python.org/3/library/functions.html#bool)] | [None](https://docs.python.org/3/library/constants.html#None) = None)
 
 This generator recursively walks into directories and compressed files and yields named tuples of type [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
 
 * **Parameters:**
-  **paths** – A filename or iterable of filenames.
+  * **paths** – A filename or iterable of filenames.
+  * **matcher** – When you provide this optional argument, it must be a callable that accepts a sequence of paths
+    as its only argument, and returns a boolean value whether this filename should be further processed or not.
 
 ### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/library/constants.html#None) = None)
 
@@ -161,6 +163,9 @@ file is wrapped in [`io.TextIOWrapper`](https://docs.python.org/3/library/io.htm
 If the last file in the list of files is an archive file, then it won’t be decompressed,
 instead you’ll be able to read the archive’s raw compressed data from the handle.
 
+In this example, we open a gzip-compressed file, stored inside a tgz archive, which
+in turn is stored in a Zip file:
+
 ```pycon
 >>> from unzipwalk import recursive_open
 >>> with recursive_open(('bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'test/cool.txt'), encoding='UTF-8') as fh:
@@ -171,7 +176,7 @@ Hi, I'm a compressed file!
 ## Command-Line Interface
 
 ```default
-usage: unzipwalk [-h] [-a] [-d | -c ALGO] [PATH ...]
+usage: unzipwalk [-h] [-a] [-d | -c ALGO] [-e EXCLUDE] [PATH ...]
 
 Recursively walk into directories and archives
 
@@ -183,9 +188,14 @@ optional arguments:
   -a, --all-files       also list dirs, symlinks, etc.
   -d, --dump            also dump file contents
   -c ALGO, --checksum ALGO
-                        generate a checksum for each file
+                        generate a checksum for each file**
+  -e EXCLUDE, --exclude EXCLUDE
+                        filename globs to exclude*
 
-Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, sha1, sha224,
+* Note --exclude currently only matches against the final name in the
+sequence, excluding path names, but this interface may change in future
+versions. For more control, use the library instead of this command-line tool.
+** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, sha1, sha224,
 sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512, sha512_224,
 sha512_256, shake_128, shake_256, sm3
 ```

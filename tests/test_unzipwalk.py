@@ -145,6 +145,24 @@ class UnzipWalkTestCase(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             list(uut.unzipwalk('/this_file_should_not_exist'))
 
+    def test_unzipwalk_matcher(self):
+        # filter from the initial path list
+        self.assertEqual( [ r for r in self.expect_all if r[0][0].name != 'more.zip' ],
+            sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(os.curdir,
+                matcher=lambda p: p[0].stem.lower()!='more' ) ) )
+        # filter from zip file
+        self.assertEqual( [ r for r in self.expect_all if r[0][-1].name != 'six.txt' ],
+            sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(os.curdir,
+                matcher=lambda p: p[-1].name.lower()!='six.txt' ) ) )
+        # filter a gz file
+        self.assertEqual( [ r for r in self.expect_all if not ( r[0][0].name=='archive.tar.gz' and r[0][-1].name == 'world.txt' ) ],
+            sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(os.curdir,
+                matcher=lambda p: len(p)<2 or p[-2].as_posix()!='archive/world.txt.gz' ) ) )
+        # filter from tar file
+        self.assertEqual( [ r for r in self.expect_all if not ( len(r[0])>1 and r[0][1].stem=='abc' ) ],
+            sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(os.curdir,
+                matcher=lambda p: p[-1].name != 'abc.zip' ) ) )
+
     def test_recursive_open(self):
         for file in self.expect_all:
             if file[2] == FileType.FILE:
@@ -212,3 +230,6 @@ class UnzipWalkTestCase(unittest.TestCase):
             (f"# {e[2].name} " if e[1] is None else f"{hashlib.sha512(e[1]).hexdigest()} *")
             + f"{str(e[0][0]) if len(e[0])==1 else repr(tuple(str(n) for n in e[0]))}"
             for e in self.expect_all ) )
+        self.assertEqual( self._run_cli(['-e','world.*','--exclude=*abc*']), sorted(  # exclude
+            f"FILE {tuple(str(n) for n in e[0])!r}" for e in self.expect_all if e[2]==FileType.FILE
+            and not ( e[0][-1].name.startswith('world.') or len(e[0])>1 and e[0][1].name=='abc.zip' ) ) )
