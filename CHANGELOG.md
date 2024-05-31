@@ -1,10 +1,11 @@
 Changelog for unzipwalk
 =======================
 
-1.1.0 - *unreleased*
---------------------
+1.1.0 - Fri, May 31 2024
+------------------------
 
-- ...
+- Added `unzipwalk.recursive_open()`.
+- Updated documentation.
 
 1.0.0 - Wed, May 22 2024
 ------------------------

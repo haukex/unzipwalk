@@ -34,7 +34,8 @@ This means that you must use the handles as soon as you get them from the genera
 something as seemingly simple as `sorted(unzipwalk('.'))` would cause the code above to fail,
 because all files will have been opened and closed during the call to [`sorted()`](https://docs.python.org/3/library/functions.html#sorted)
 and the handles to read the data would no longer be available in the body of the loop.
-This is why the code first processes all the files before sorting the results.
+This is why the above example first processes all the files before sorting the results.
+You can also use [`recursive_open()`](#unzipwalk.recursive_open) to open the files later.
 
 The yielded file handles can be wrapped in [`io.TextIOWrapper`](https://docs.python.org/3/library/io.html#io.TextIOWrapper) to read them as text files.
 For example, to read all CSV files in the current directory and below, including within compressed files:
@@ -45,7 +46,7 @@ For example, to read all CSV files in the current directory and below, including
 >>> import csv
 >>> for result in unzipwalk('.'):
 ...     if result.typ==FileType.FILE and result.names[-1].suffix.lower()=='.csv':
-...         print([ str(name) for name in result.names ])
+...         print([ name.as_posix() for name in result.names ])
 ...         with TextIOWrapper(result.hnd, encoding='UTF-8', newline='') as handle:
 ...             csv_rd = csv.reader(handle, strict=True)
 ...             for row in csv_rd:
@@ -145,6 +146,26 @@ A symbolic link.
 
 Some other file type (e.g. FIFO).
 
+### unzipwalk.recursive_open(fns: [Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)], encoding=None, errors=None, newline=None)
+
+This context manager allows opening files nested inside archives directly.
+
+[`unzipwalk()`](#function-unzipwalk) automatically closes files as it iterates through directories and archives;
+this function exists to allow you to open the returned files after the iteration.
+
+If *any* of `encoding`, `errors`, or `newline` is specified, the returned
+file is wrapped in [`io.TextIOWrapper`](https://docs.python.org/3/library/io.html#io.TextIOWrapper)!
+
+If the last file in the list of files is an archive file, then it won’t be decompressed,
+instead you’ll be able to read the archive’s raw compressed data from the handle.
+
+```pycon
+>>> from unzipwalk import recursive_open
+>>> with recursive_open(('bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'test/cool.txt'), encoding='UTF-8') as fh:
+...     print(fh.read())
+Hi, I'm a compressed file!
+```
+
 ## Command-Line Interface
 
 ```default
@@ -162,9 +183,9 @@ optional arguments:
   -c ALGO, --checksum ALGO
                         generate a checksum for each file
 
-Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, ripemd160,
-sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
-sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
+Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, sha1, sha224,
+sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512, sha512_224,
+sha512_256, shake_128, shake_256, sm3
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.

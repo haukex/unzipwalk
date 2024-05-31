@@ -29,6 +29,7 @@ import shutil
 import hashlib
 import doctest
 import unittest
+from hashlib import sha1
 from copy import deepcopy
 from unittest.mock import patch
 from typing import Optional, cast
@@ -143,6 +144,29 @@ class UnzipWalkTestCase(unittest.TestCase):
     def test_unzipwalk_errs(self):
         with self.assertRaises(FileNotFoundError):
             list(uut.unzipwalk('/this_file_should_not_exist'))
+
+    def test_recursive_open(self):
+        for file in self.expect_all:
+            if file[2] == FileType.FILE:
+                with uut.recursive_open(file[0]) as fh:
+                    self.assertEqual( fh.read(), file[1] )
+        # text mode
+        with uut.recursive_open(("archive.tar.gz", "archive/abc.zip", "abc.txt"), encoding='UTF-8') as fh:
+            assert isinstance(fh, io.TextIOWrapper)
+            self.assertEqual( fh.readlines(), ["One two three\n", "four five six\n", "seven eight nine\n"] )
+        # open an archive
+        with uut.recursive_open(('archive.tar.gz', 'archive/abc.zip')) as fh:
+            assert isinstance(fh, uut.ReadOnlyBinary)
+            self.assertEqual( sha1(fh.read()).hexdigest(), '4d6be7a2e79c3341dd5c4fe669c0ca40a8765031' )
+        # basic error
+        with self.assertRaises(ValueError):
+            with uut.recursive_open(()): pass
+        # gzip bad filename
+        with self.assertRaises(FileNotFoundError):
+            with uut.recursive_open(("archive.tar.gz", "archive/world.txt.gz", "archive/bang.txt")): pass
+        # TarFile.extractfile: attempt to open a directory
+        with self.assertRaises(FileNotFoundError):
+            with uut.recursive_open(("archive.tar.gz", "archive/test2/")): pass
 
     def test_result_validate(self):
         with self.assertRaises(ValueError):

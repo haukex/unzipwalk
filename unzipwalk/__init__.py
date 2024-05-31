@@ -32,7 +32,8 @@ This means that you must use the handles as soon as you get them from the genera
 something as seemingly simple as ``sorted(unzipwalk('.'))`` would cause the code above to fail,
 because all files will have been opened and closed during the call to :func:`sorted`
 and the handles to read the data would no longer be available in the body of the loop.
-This is why the code first processes all the files before sorting the results.
+This is why the above example first processes all the files before sorting the results.
+You can also use :func:`recursive_open` to open the files later.
 
 The yielded file handles can be wrapped in :class:`io.TextIOWrapper` to read them as text files.
 For example, to read all CSV files in the current directory and below, including within compressed files:
@@ -42,7 +43,7 @@ For example, to read all CSV files in the current directory and below, including
     >>> import csv
     >>> for result in unzipwalk('.'):
     ...     if result.typ==FileType.FILE and result.names[-1].suffix.lower()=='.csv':
-    ...         print([ str(name) for name in result.names ])
+    ...         print([ name.as_posix() for name in result.names ])
     ...         with TextIOWrapper(result.hnd, encoding='UTF-8', newline='') as handle:
     ...             csv_rd = csv.reader(handle, strict=True)
     ...             for row in csv_rd:
@@ -65,6 +66,8 @@ Members
 
 .. autoclass:: unzipwalk.FileType
     :members:
+
+.. autofunction:: unzipwalk.recursive_open
 
 Command-Line Interface
 ----------------------
@@ -103,10 +106,11 @@ from gzip import GzipFile
 from tarfile import TarFile
 from zipfile import ZipFile
 from itertools import chain
-from collections.abc import Generator
+from contextlib import contextmanager
+from collections.abc import Generator, Sequence
 from pathlib import PurePosixPath, PurePath, Path
-from typing import Optional, cast, Protocol, Literal, BinaryIO, NamedTuple, runtime_checkable
-from igbpyutils.file import AnyPaths, to_Paths
+from typing import Optional, cast, Protocol, Literal, BinaryIO, NamedTuple, runtime_checkable, Union
+from igbpyutils.file import AnyPaths, to_Paths, Filename
 import igbpyutils.error
 
 class FileType(Enum):
@@ -172,6 +176,68 @@ class UnzipWalkResult(NamedTuple):
             raise TypeError(f"invalid handle, should be None but is {self.hnd!r}")
         return self
 
+@contextmanager
+def _inner_recur_open(fh :BinaryIO, fns :tuple[Path, ...]) -> Generator[BinaryIO, None, None]:
+    try:
+        bl = fns[0].name.lower()
+        assert fns
+        if len(fns)==1:
+            yield fh
+        # the following code is very similar to _proc_file, please see those code comments for details
+        elif bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
+            with TarFile.open(fileobj=fh) as tf:
+                ef = tf.extractfile(str(fns[1]))
+                if not ef:  # e.g. directory
+                    raise FileNotFoundError(f"not a file? {fns[0:2]}")
+                with ef as fh2:
+                    with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                        yield inner
+        elif bl.endswith('.zip'):
+            with ZipFile(fh) as zf:
+                with zf.open(str(fns[1])) as fh2:
+                    with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                        yield inner
+        elif bl.endswith('.gz'):
+            if fns[1] != fns[0].with_suffix(''):
+                raise FileNotFoundError(f"invalid gzip filename {fns[0]} => {fns[1]}")
+            with GzipFile(fileobj=fh, mode='rb') as fh2:
+                with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                    yield inner
+        else:
+            assert False, 'should be unreachable'  # pragma: no cover
+    except GeneratorExit:  # https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/contextmanager-generator-missing-cleanup.html
+        pass  # pragma: no cover
+
+@contextmanager
+def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=None) \
+        -> Generator[Union[ReadOnlyBinary, io.TextIOWrapper], None, None]:
+    """This context manager allows opening files nested inside archives directly.
+
+    :func:`unzipwalk` automatically closes files as it iterates through directories and archives;
+    this function exists to allow you to open the returned files after the iteration.
+
+    If *any* of ``encoding``, ``errors``, or ``newline`` is specified, the returned
+    file is wrapped in :class:`io.TextIOWrapper`!
+
+    If the last file in the list of files is an archive file, then it won't be decompressed,
+    instead you'll be able to read the archive's raw compressed data from the handle.
+
+    >>> from unzipwalk import recursive_open
+    >>> with recursive_open(('bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'test/cool.txt'), encoding='UTF-8') as fh:
+    ...     print(fh.read())# doctest: +NORMALIZE_WHITESPACE
+    Hi, I'm a compressed file!
+    """
+    # note Sphinx's "WARNING: py:class reference target not found: _io.TextIOWrapper" can be ignored
+    if not fns:
+        raise ValueError('no filenames given')
+    with open(fns[0], 'rb') as fh:
+        with _inner_recur_open(fh, tuple( Path(f) for f in fns )) as inner:
+            assert inner.readable()
+            if encoding is not None or errors is not None or newline is not None:
+                yield io.TextIOWrapper(inner, encoding=encoding, errors=errors, newline=newline)
+            else:
+                yield cast(ReadOnlyBinary, inner)
+
 def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO) -> Generator[UnzipWalkResult, None, None]:
     bl = fns[-1].name.lower()
     if bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
@@ -186,7 +252,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO) -> Generator[UnzipWalkRe
                     yield UnzipWalkResult(names=new_names, typ=FileType.DIR)
                 elif ti.isfile():
                     # Note apparently this can burn a lot of memory on <3.13: https://github.com/python/cpython/issues/102120
-                    ef = tf.extractfile(ti)
+                    ef = tf.extractfile(ti)  # always binary
                     assert ef is not None  # make type checker happy; we know this is true because we checked it's a file
                     with ef as fh2:
                         assert fh2.readable()  # expected by ReadOnlyBinary
@@ -209,14 +275,14 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO) -> Generator[UnzipWalkRe
                 elif zi.is_dir():
                     yield UnzipWalkResult(names=new_names, typ=FileType.DIR)
                 else:  # (note this interface doesn't have an is_file)
-                    with zf.open(zi) as fh2:
+                    with zf.open(zi) as fh2:  # always binary mode
                         assert fh2.readable()  # expected by ReadOnlyBinary
                         # NOTE type checker thinks fh2 is typing.IO[bytes], but it's actually a zipfile.ZipExtFile,
                         # which is an io.BufferedIOBase subclass - which should be safe to cast to BinaryIO, I think.
                         yield from _proc_file(new_names, cast(BinaryIO, fh2))
     elif bl.endswith('.gz'):
         yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
-        with GzipFile(fileobj=fh, mode='rb') as fh2:
+        with GzipFile(fileobj=fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
             assert fh2.readable()  # expected by ReadOnlyBinary
             # NOTE casting GzipFile to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
             # but testing seems to show it's ok...
