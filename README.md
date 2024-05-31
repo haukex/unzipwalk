@@ -146,6 +146,8 @@ A symbolic link.
 
 Some other file type (e.g. FIFO).
 
+<a id="unzipwalk.recursive_open"></a>
+
 ### unzipwalk.recursive_open(fns: [Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)], encoding=None, errors=None, newline=None)
 
 This context manager allows opening files nested inside archives directly.
