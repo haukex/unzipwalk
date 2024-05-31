@@ -9,26 +9,30 @@ Currently supported are ZIP, tar, tgz, and gz compressed files.
 File types are detected based on their extensions.
 
     >>> from unzipwalk import unzipwalk
+    >>> results = []
     >>> for result in unzipwalk('.'):
-    ...     print(f"{[ str(name) for name in result.names ]} {result.typ.name}")
-    ...     if result.hnd:
+    ...     names = tuple( name.as_posix() for name in result.names )
+    ...     if result.hnd:  # result is a file opened for reading (binary)
     ...         # could use result.hnd.read() here, or for line-by-line:
     ...         for line in result.hnd:
     ...             pass  # do something interesting with the data here
-    ['bar.zip'] ARCHIVE
-    ['bar.zip', 'bar.txt'] FILE
-    ['bar.zip', 'test.tar.gz'] ARCHIVE
-    ['bar.zip', 'test.tar.gz', 'test'] DIR
-    ['bar.zip', 'test.tar.gz', 'test/cool.txt.gz'] ARCHIVE
-    ['bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'test/cool.txt'] FILE
-    ['bar.zip', 'test.tar.gz', 'hello.csv'] FILE
-    ['foo.txt'] FILE
+    ...     results.append(names + (result.typ.name,))
+    >>> print(sorted(results))# doctest: +NORMALIZE_WHITESPACE
+    [('bar.zip', 'ARCHIVE'),
+     ('bar.zip', 'bar.txt', 'FILE'),
+     ('bar.zip', 'test.tar.gz', 'ARCHIVE'),
+     ('bar.zip', 'test.tar.gz', 'hello.csv', 'FILE'),
+     ('bar.zip', 'test.tar.gz', 'test', 'DIR'),
+     ('bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'ARCHIVE'),
+     ('bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'test/cool.txt', 'FILE'),
+     ('foo.txt', 'FILE')]
 
-*Note* that :func:`unzipwalk` automatically closes files as it goes from file to file.
+**Note** that :func:`unzipwalk` automatically closes files as it goes from file to file.
 This means that you must use the handles as soon as you get them from the generator -
-something as seemingly simple as ``sorted(unzipwalk('.'))`` will cause the code above to fail,
+something as seemingly simple as ``sorted(unzipwalk('.'))`` would cause the code above to fail,
 because all files will have been opened and closed during the call to :func:`sorted`
-and no longer be available in the body of the loop.
+and the handles to read the data would no longer be available in the body of the loop.
+This is why the code first processes all the files before sorting the results.
 
 The yielded file handles can be wrapped in :class:`io.TextIOWrapper` to read them as text files.
 For example, to read all CSV files in the current directory and below, including within compressed files:
