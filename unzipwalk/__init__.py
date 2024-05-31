@@ -343,17 +343,19 @@ def main(argv=None):
         return not any( fnmatch(paths[-1].name, pat) for pat in args.exclude )
     for result in unzipwalk( args.paths if args.paths else Path(), matcher=matcher ):
         names = tuple( str(n) for n in result.names )
-        if (args.dump or args.checksum) and result.typ==FileType.FILE:
-            assert result.hnd is not None  # make type checker happy; we know this is true because we checked it's a file
-            if args.checksum:
+        if args.checksum:
+            name = names[0] if len(names)==1 and not names[0].startswith('(') and '\n' not in names[0] and '\r' not in names[0] else repr(names)
+            if result.typ==FileType.FILE:
+                assert result.hnd is not None
                 h = hashlib.new(args.checksum)
                 h.update(result.hnd.read())
-                print(f"{h.hexdigest()} *{names[0] if len(names)==1 else repr(names)}")
-            else:
+                print(f"{h.hexdigest()} *{name}")
+            elif args.all_files:
+                print(f"# {result.typ.name} {name}")
+        else:
+            if result.typ==FileType.FILE and args.dump:
+                assert result.hnd is not None
                 print(f"{result.typ.name} {names!r} {result.hnd.read()!r}")
-        elif result.typ==FileType.FILE or args.all_files:
-            if args.checksum:
-                print(f"# {result.typ.name} {names[0] if len(names)==1 else repr(names)}")
-            else:
+            elif result.typ==FileType.FILE or args.all_files:
                 print(f"{result.typ.name} {names!r}")
     parser.exit(0)
