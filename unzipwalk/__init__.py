@@ -177,7 +177,7 @@ class UnzipWalkResult(NamedTuple):
         return self
 
 @contextmanager
-def _inner_recur_open(fh :BinaryIO, fns :tuple[Path, ...]) -> Generator[BinaryIO, None, None]:
+def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[BinaryIO, None, None]:
     try:
         bl = fns[0].name.lower()
         assert fns
@@ -231,7 +231,7 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
     if not fns:
         raise ValueError('no filenames given')
     with open(fns[0], 'rb') as fh:
-        with _inner_recur_open(fh, tuple( Path(f) for f in fns )) as inner:
+        with _inner_recur_open(fh, (Path(fns[0]),) + tuple( PurePosixPath(f) for f in fns[1:] )) as inner:
             assert inner.readable()
             if encoding is not None or errors is not None or newline is not None:
                 yield io.TextIOWrapper(inner, encoding=encoding, errors=errors, newline=newline)
