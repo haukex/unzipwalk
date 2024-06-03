@@ -34,8 +34,8 @@ from copy import deepcopy
 from unittest.mock import patch
 from typing import Optional, cast
 from tempfile import TemporaryDirectory, TemporaryFile
-from pathlib import PurePath, Path, PurePosixPath
 from contextlib import redirect_stdout, redirect_stderr
+from pathlib import PurePath, Path, PurePosixPath, PureWindowsPath
 from unzipwalk import FileType
 import unzipwalk as uut
 
@@ -198,6 +198,68 @@ class UnzipWalkTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             with TemporaryFile() as tf:
                 uut.UnzipWalkResult((Path(),), FileType.OTHER, cast(uut.ReadOnlyBinary, tf)).validate()
+
+    def test_checksum_lines(self):
+        res = uut.UnzipWalkResult(names=(PurePosixPath('hello'),), typ=FileType.DIR)
+        ln = res.checksum_line("md5")
+        self.assertEqual( ln, "# DIR hello" )
+        self.assertEqual( uut.UnzipWalkResult.from_checksum_line(ln), res )
+
+        res = uut.UnzipWalkResult(names=(PurePosixPath('hello\nworld'),), typ=FileType.DIR)
+        ln = res.checksum_line("md5")
+        self.assertEqual( ln, "# DIR ('hello\\nworld',)" )
+        self.assertEqual( uut.UnzipWalkResult.from_checksum_line(ln), res )
+
+        res = uut.UnzipWalkResult(names=(PurePosixPath('(hello'),), typ=FileType.DIR)
+        ln = res.checksum_line("md5")
+        self.assertEqual( ln, "# DIR ('(hello',)" )
+        self.assertEqual( uut.UnzipWalkResult.from_checksum_line(ln), res )
+
+        res = uut.UnzipWalkResult(names=(PurePosixPath(' hello '),), typ=FileType.DIR)
+        ln = res.checksum_line("md5")
+        self.assertEqual( ln, "# DIR (' hello ',)" )
+        self.assertEqual( uut.UnzipWalkResult.from_checksum_line(ln), res )
+
+        res2 = uut.UnzipWalkResult.from_checksum_line("# DIR C:\\Foo\\Bar", windows=True)
+        assert res2 is not None
+        self.assertEqual( res2.names, (PureWindowsPath('C:\\','Foo','Bar'),) )
+
+        res = uut.UnzipWalkResult(names=(PurePosixPath('hello'),PurePosixPath('world')),
+            typ=FileType.FILE, hnd=cast(uut.ReadOnlyBinary, io.BytesIO(b'abcdef')))
+        ln = res.checksum_line("md5")
+        self.assertEqual( ln, "e80b5017098950fc58aad83c8c14978e *('hello', 'world')" )
+        res2 = uut.UnzipWalkResult.from_checksum_line(ln)
+        assert res2 is not None
+        self.assertEqual( res2.names, (PurePosixPath('hello'),PurePosixPath('world')) )
+        self.assertEqual( res2.typ, FileType.FILE )
+        assert res2.hnd is not None
+        self.assertEqual( res2.hnd.read(), bytes.fromhex('e80b5017098950fc58aad83c8c14978e') )
+
+        self.assertIsNone( uut.UnzipWalkResult.from_checksum_line("# I'm just some comment") )
+        self.assertIsNone( uut.UnzipWalkResult.from_checksum_line("# FOO bar") )
+        self.assertIsNone( uut.UnzipWalkResult.from_checksum_line("  # and some other comment") )
+        self.assertIsNone( uut.UnzipWalkResult.from_checksum_line("  ") )
+
+        with self.assertRaises(ValueError):
+            uut.UnzipWalkResult.from_checksum_line("e80b5017098950fc58aad83c8c14978g *blam")
+        with self.assertRaises(ValueError):
+            uut.UnzipWalkResult.from_checksum_line("e80b5017098950fc58aad83c8c14978e *(blam")
+
+    def test_decode_tuple(self):
+        self.assertEqual( uut.decode_tuple(repr(('hi',))), ('hi',) )
+        self.assertEqual( uut.decode_tuple(repr(('hi','there'))), ('hi','there') )
+        self.assertEqual( uut.decode_tuple('( "foo" , \'bar\' ) '), ('foo','bar') )
+        self.assertEqual( uut.decode_tuple("('hello',)"), ('hello',) )
+        self.assertEqual( uut.decode_tuple('"foo","bar"'), ('foo','bar') )
+        with self.assertRaises(ValueError): uut.decode_tuple('')
+        with self.assertRaises(ValueError): uut.decode_tuple('X=("foo",)')
+        with self.assertRaises(ValueError): uut.decode_tuple('(')
+        with self.assertRaises(ValueError): uut.decode_tuple('()')
+        with self.assertRaises(ValueError): uut.decode_tuple('("foo")')
+        with self.assertRaises(ValueError): uut.decode_tuple('("foo","bar",3)')
+        with self.assertRaises(ValueError): uut.decode_tuple('("foo","bar",str)')
+        with self.assertRaises(ValueError): uut.decode_tuple('("foo","bar","x"+"y")')
+        with self.assertRaises(ValueError): uut.decode_tuple('["foo","bar"]')
 
     def _run_cli(self, argv :list[str]) -> list[str]:
         sys.argv = [os.path.basename(uut.__file__)] + argv

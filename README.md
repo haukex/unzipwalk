@@ -69,6 +69,8 @@ This generator recursively walks into directories and compressed files and yield
   * **matcher** – When you provide this optional argument, it must be a callable that accepts a sequence of paths
     as its only argument, and returns a boolean value whether this filename should be further processed or not.
 
+<a id="unzipwalk.UnzipWalkResult"></a>
+
 ### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/library/constants.html#None) = None)
 
 Return type for [`unzipwalk()`](#function-unzipwalk).
@@ -87,6 +89,7 @@ A [`FileType`](#unzipwalk.FileType) value representing the type of the current f
 
 When [`typ`](#unzipwalk.UnzipWalkResult.typ) is [`FileType.FILE`](#unzipwalk.FileType), this is a [`ReadOnlyBinary`](#unzipwalk.ReadOnlyBinary) file handle (file object)
 for reading the file contents in binary mode. Otherwise, this is [`None`](https://docs.python.org/3/library/constants.html#None).
+If this object was produced by [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line), this handle will read the checksum of the data, *not the data itself!*
 
 #### validate()
 
@@ -97,6 +100,48 @@ Intended for internal use, mainly when type checkers are not being used.
 
 * **Returns:**
   The object itself, for method chaining.
+* **Raises:**
+  [**ValueError**](https://docs.python.org/3/library/exceptions.html#ValueError)**,** [**TypeError**](https://docs.python.org/3/library/exceptions.html#TypeError) – If the object is invalid.
+
+<a id="unzipwalk.UnzipWalkResult.checksum_line"></a>
+
+#### checksum_line(hash_algo: [str](https://docs.python.org/3/library/stdtypes.html#str))
+
+Encodes this object into a line of text suitable for use as a checksum line.
+
+Intended mostly for internal use by the `--checksum` CLI option.
+
+**Warning:** Requires that the file handle be open (for files), and will read from it!
+
+See also [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line) for the inverse operation.
+
+* **Parameters:**
+  **hash_algo** – The hashing algorithm to use, as recognized by [`hashlib.new()`](https://docs.python.org/3/library/hashlib.html#hashlib.new).
+* **Returns:**
+  The checksum line, without trailing newline.
+
+<a id="unzipwalk.UnzipWalkResult.from_checksum_line"></a>
+
+#### *classmethod* from_checksum_line(line: [str](https://docs.python.org/3/library/stdtypes.html#str), \*, windows: [bool](https://docs.python.org/3/library/functions.html#bool) = False)
+
+Decodes a checksum line as produced by [`checksum_line()`](#unzipwalk.UnzipWalkResult.checksum_line).
+
+**Warning:** The `hnd` of the returned object will *not* be a handle to
+the data from the file, instead it will be a handle to read the checksum of the file!
+(You could use [`recursive_open()`](#unzipwalk.recursive_open) to open the files themselves.)
+
+Intended as a utility function for use when reading files produced by the `--checksum` CLI option.
+
+* **Parameters:**
+  * **line** – The line to parse.
+  * **windows** – Set this to [`True`](https://docs.python.org/3/library/constants.html#True) if the pathname in the line is in Windows format,
+    otherwise it is assumed the filename is in POSIX format.
+* **Returns:**
+  The [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) object, or [`None`](https://docs.python.org/3/library/constants.html#None) for empty or comment lines.
+* **Raises:**
+  [**ValueError**](https://docs.python.org/3/library/exceptions.html#ValueError) – If the line could not be parsed.
+
+<a id="unzipwalk.ReadOnlyBinary"></a>
 
 ### *class* unzipwalk.ReadOnlyBinary(\*args, \*\*kwargs)
 
@@ -123,6 +168,8 @@ Note [`unzipwalk()`](#function-unzipwalk) automatically closes files.
 #### seekable()
 
 #### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0)
+
+<a id="unzipwalk.FileType"></a>
 
 ### *class* unzipwalk.FileType(value)
 

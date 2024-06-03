@@ -1,8 +1,16 @@
 Changelog for unzipwalk
 =======================
 
+1.3.0 - Mon, Jun  3 2024
+------------------------
+
+- Further improved escaping of filenames with `--checksum` CLI option,
+  and provided `UnzipWalkResult.from_checksum_line()` to parse the output.
+
 1.2.1 - Fri, May 31 2024
 ------------------------
+
+`commit e3f8275b7150fd84c7e2a5ca7d7d45c991f6fcee`
 
 - Improved escaping of filenames with `--checksum` CLI option.
 

@@ -97,7 +97,9 @@ details.
 You should have received a copy of the GNU Lesser General Public License
 along with this program. If not, see https://www.gnu.org/licenses/
 """
+import re
 import io
+import ast
 import stat
 import hashlib
 import argparse
@@ -108,8 +110,8 @@ from zipfile import ZipFile
 from itertools import chain
 from fnmatch import fnmatch
 from contextlib import contextmanager
-from pathlib import PurePosixPath, PurePath, Path
 from collections.abc import Generator, Sequence, Callable
+from pathlib import PurePosixPath, PurePath, Path, PureWindowsPath
 from typing import Optional, cast, Protocol, Literal, BinaryIO, NamedTuple, runtime_checkable, Union
 from igbpyutils.file import AnyPaths, to_Paths, Filename
 import igbpyutils.error
@@ -147,6 +149,30 @@ class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
     def seekable(self) -> bool: ...
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int: ...
 
+def decode_tuple(code :str) -> tuple[str, ...]:
+    """Helper function to parse a string as produced by :func:`repr` from a :class:`tuple` of one or more :class:`str`.
+
+    :param code: The code to parse.
+    :return: The :class:`tuple` that was parsed.
+    :raises ValueError: If the code could not be parsed.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as ex:
+        raise ValueError() from ex
+    if not len(tree.body)==1 or not isinstance(tree.body[0], ast.Expr) or not isinstance(tree.body[0].value, ast.Tuple) \
+            or not isinstance(tree.body[0].value.ctx, ast.Load) or len(tree.body[0].value.elts)<1:
+        raise ValueError(f"failed to decode tuple {code!r}")
+    elements = []
+    for e in tree.body[0].value.elts:
+        if not isinstance(e, ast.Constant) or not isinstance(e.value, str):
+            raise ValueError(f"failed to decode tuple {code!r}")
+        elements.append(e.value)
+    return tuple(elements)
+
+CHECKSUM_LINE_RE = re.compile(r'^([0-9a-f]+) \*(.+)$')
+CHECKSUM_COMMENT_RE = re.compile(r'^# ([A-Z]+) (.+)$')
+
 class UnzipWalkResult(NamedTuple):
     """Return type for :func:`unzipwalk`."""
     #: A tuple of the filename(s) as :mod:`pathlib` objects. The first element is always the physical file in the file system.
@@ -157,14 +183,18 @@ class UnzipWalkResult(NamedTuple):
     typ :FileType
     #: When :attr:`typ` is :class:`FileType.FILE<FileType>`, this is a :class:`ReadOnlyBinary` file handle (file object)
     #: for reading the file contents in binary mode. Otherwise, this is :obj:`None`.
+    #: If this object was produced by :meth:`from_checksum_line`, this handle will read the checksum of the data, *not the data itself!*
     hnd :Optional[ReadOnlyBinary] = None
+
     def validate(self):
         """Validate whether the object's fields are set properly and throw errors if not.
 
         Intended for internal use, mainly when type checkers are not being used.
         :func:`unzipwalk` validates all the results it returns.
 
-        :return: The object itself, for method chaining."""
+        :return: The object itself, for method chaining.
+        :raises ValueError, TypeError: If the object is invalid.
+        """
         if not self.names:
             raise ValueError('names is empty')
         if not all( isinstance(n, PurePath) for n in self.names ):  # pyright: ignore [reportUnnecessaryIsInstance]
@@ -176,6 +206,64 @@ class UnzipWalkResult(NamedTuple):
         if self.typ!=FileType.FILE and self.hnd is not None:
             raise TypeError(f"invalid handle, should be None but is {self.hnd!r}")
         return self
+
+    def checksum_line(self, hash_algo :str) -> str:
+        """Encodes this object into a line of text suitable for use as a checksum line.
+
+        Intended mostly for internal use by the ``--checksum`` CLI option.
+
+        **Warning:** Requires that the file handle be open (for files), and will read from it!
+
+        See also :meth:`from_checksum_line` for the inverse operation.
+
+        :param hash_algo: The hashing algorithm to use, as recognized by :func:`hashlib.new`.
+        :return: The checksum line, without trailing newline.
+        """
+        names = tuple( str(n) for n in self.names )
+        if len(names)==1 and names[0] and names[0].strip()==names[0] and not names[0].startswith('(') \
+                and '\n' not in names[0] and '\r' not in names[0]:  # pylint: disable=too-many-boolean-expressions
+            name = names[0]
+        else:
+            name = repr(names)
+            assert name.startswith('(')
+        assert '\n' not in name and '\r' not in name
+        if self.typ == FileType.FILE:
+            assert self.hnd is not None
+            h = hashlib.new(hash_algo)
+            h.update(self.hnd.read())
+            return f"{h.hexdigest().lower()} *{name}"
+        return f"# {self.typ.name} {name}"
+
+    @classmethod
+    def from_checksum_line(cls, line :str, *, windows :bool=False) -> Optional['UnzipWalkResult']:
+        """Decodes a checksum line as produced by :meth:`checksum_line`.
+
+        **Warning:** The ``hnd`` of the returned object will *not* be a handle to
+        the data from the file, instead it will be a handle to read the checksum of the file!
+        (You could use :func:`recursive_open` to open the files themselves.)
+
+        Intended as a utility function for use when reading files produced by the ``--checksum`` CLI option.
+
+        :param line: The line to parse.
+        :param windows: Set this to :obj:`True` if the pathname in the line is in Windows format,
+            otherwise it is assumed the filename is in POSIX format.
+        :return: The :class:`UnzipWalkResult` object, or :obj:`None` for empty or comment lines.
+        :raises ValueError: If the line could not be parsed.
+        """
+        if not line.strip():
+            return None
+        path_cls = PureWindowsPath if windows else PurePosixPath
+        def mk_names(name :str)-> tuple[PurePath, ...]:
+            names = decode_tuple(name) if name.startswith('(') else (name,)
+            return tuple(path_cls(p) for p in names)
+        if line.lstrip().startswith('#'):  # comment, be lenient to allow user comments
+            if m := CHECKSUM_COMMENT_RE.match(line):
+                if m.group(1) in FileType.__members__:
+                    return cls( names=mk_names(m.group(2)), typ=FileType[m.group(1)] )
+            return None
+        if m := CHECKSUM_LINE_RE.match(line):
+            return cls( names=mk_names(m.group(2)), typ=FileType.FILE, hnd=cast(ReadOnlyBinary, io.BytesIO(bytes.fromhex(m.group(1)))) )
+        raise ValueError(f"failed to decode checksum line {line!r}")
 
 @contextmanager
 def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[BinaryIO, None, None]:
@@ -342,17 +430,11 @@ def main(argv=None):
     def matcher(paths :Sequence[PurePath]) -> bool:
         return not any( fnmatch(paths[-1].name, pat) for pat in args.exclude )
     for result in unzipwalk( args.paths if args.paths else Path(), matcher=matcher ):
-        names = tuple( str(n) for n in result.names )
         if args.checksum:
-            name = names[0] if len(names)==1 and not names[0].startswith('(') and '\n' not in names[0] and '\r' not in names[0] else repr(names)
-            if result.typ==FileType.FILE:
-                assert result.hnd is not None
-                h = hashlib.new(args.checksum)
-                h.update(result.hnd.read())
-                print(f"{h.hexdigest()} *{name}")
-            elif args.all_files:
-                print(f"# {result.typ.name} {name}")
+            if result.typ == FileType.FILE or args.all_files:
+                print(result.checksum_line(args.checksum))
         else:
+            names = tuple( str(n) for n in result.names )
             if result.typ==FileType.FILE and args.dump:
                 assert result.hnd is not None
                 print(f"{result.typ.name} {names!r} {result.hnd.read()!r}")
