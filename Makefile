@@ -85,7 +85,7 @@ other-checks:  ## Checks not depending on the Python version
 	@set -euxo pipefail
 	pre-commit run -c dev/pre-commit.yml --all-files
 	# note the following is on one line b/c GitHub macOS Action Runners are running bash 3.2 and the multiline version didn't work there...
-	for REQ in $(requirement_txts); do pur --dry-run-changed --nonzero-exit-code -r "$$REQ"; done
+	for REQ in $(requirement_txts); do pur --skip-gt --dry-run-changed --nonzero-exit-code -r "$$REQ"; done
 
 unittest:  ## Run unit tests
 	@PYTHONDEVMODE=1 PYTHONWARNINGS=error PYTHONWARNDEFAULTENCODING=1 $(PYTHON3BIN) -m unittest -v

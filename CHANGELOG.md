@@ -1,6 +1,11 @@
 Changelog for unzipwalk
 =======================
 
+1.4.0 - Mon, Jun 17 2024
+------------------------
+
+- Made requirements more lenient to avoid dependency conflicts
+
 1.3.0 - Mon, Jun  3 2024
 ------------------------
 
