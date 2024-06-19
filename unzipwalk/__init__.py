@@ -60,14 +60,14 @@ Members
 .. autoclass:: unzipwalk.UnzipWalkResult
     :members:
 
-.. autoclass:: unzipwalk.ReadOnlyBinary
-    :members:
-    :undoc-members:
-
 .. autoclass:: unzipwalk.FileType
     :members:
 
 .. autofunction:: unzipwalk.recursive_open
+
+.. autoclass:: unzipwalk.ReadOnlyBinary
+    :members:
+    :undoc-members:
 
 Command-Line Interface
 ----------------------
@@ -163,7 +163,7 @@ def decode_tuple(code :str) -> tuple[str, ...]:
     if not len(tree.body)==1 or not isinstance(tree.body[0], ast.Expr) or not isinstance(tree.body[0].value, ast.Tuple) \
             or not isinstance(tree.body[0].value.ctx, ast.Load) or len(tree.body[0].value.elts)<1:
         raise ValueError(f"failed to decode tuple {code!r}")
-    elements = []
+    elements :list[str] = []
     for e in tree.body[0].value.elts:
         if not isinstance(e, ast.Constant) or not isinstance(e.value, str):
             raise ValueError(f"failed to decode tuple {code!r}")
@@ -225,10 +225,10 @@ class UnzipWalkResult(NamedTuple):
             name = names[0]
         else:
             name = repr(names)
-            assert name.startswith('(')
-        assert '\n' not in name and '\r' not in name
+            assert name.startswith('('), name
+        assert '\n' not in name and '\r' not in name, name
         if self.typ == FileType.FILE:
-            assert self.hnd is not None
+            assert self.hnd is not None, self
             h = hashlib.new(hash_algo)
             h.update(self.hnd.read())
             return f"{h.hexdigest().lower()} *{name}"
@@ -269,7 +269,7 @@ class UnzipWalkResult(NamedTuple):
 def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[BinaryIO, None, None]:
     try:
         bl = fns[0].name.lower()
-        assert fns
+        assert fns, fns
         if len(fns)==1:
             yield fh
         # the following code is very similar to _proc_file, please see those code comments for details
@@ -324,7 +324,7 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
         raise ValueError('no filenames given')
     with open(fns[0], 'rb') as fh:
         with _inner_recur_open(fh, (Path(fns[0]),) + tuple( PurePosixPath(f) for f in fns[1:] )) as inner:
-            assert inner.readable()
+            assert inner.readable(), inner
             if encoding is not None or errors is not None or newline is not None:
                 yield io.TextIOWrapper(inner, encoding=encoding, errors=errors, newline=newline)
             else:
@@ -348,9 +348,9 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *, matcher :Optional[Fil
                 elif ti.isfile():
                     # Note apparently this can burn a lot of memory on <3.13: https://github.com/python/cpython/issues/102120
                     ef = tf.extractfile(ti)  # always binary
-                    assert ef is not None  # make type checker happy; we know this is true because we checked it's a file
+                    assert ef is not None, ti  # make type checker happy; we know this is true because we checked it's a file
                     with ef as fh2:
-                        assert fh2.readable()  # expected by ReadOnlyBinary
+                        assert fh2.readable(), ti  # expected by ReadOnlyBinary
                         # NOTE type checker thinks fh2 is typing.IO[bytes], but it's actually a tarfile.ExFileObject,
                         # which is an io.BufferedReader subclass - which should be safe to cast to BinaryIO, I think.
                         yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher)
@@ -372,7 +372,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *, matcher :Optional[Fil
                     yield UnzipWalkResult(names=new_names, typ=FileType.DIR)
                 else:  # (note this interface doesn't have an is_file)
                     with zf.open(zi) as fh2:  # always binary mode
-                        assert fh2.readable()  # expected by ReadOnlyBinary
+                        assert fh2.readable(), zi  # expected by ReadOnlyBinary
                         # NOTE type checker thinks fh2 is typing.IO[bytes], but it's actually a zipfile.ZipExtFile,
                         # which is an io.BufferedIOBase subclass - which should be safe to cast to BinaryIO, I think.
                         yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher)
@@ -381,12 +381,12 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *, matcher :Optional[Fil
         new_names = (*fns, fns[-1].with_suffix(''))
         if matcher is not None and not matcher(new_names): return
         with GzipFile(fileobj=fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
-            assert fh2.readable()  # expected by ReadOnlyBinary
+            assert fh2.readable(), new_names  # expected by ReadOnlyBinary
             # NOTE casting GzipFile to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
             # but testing seems to show it's ok...
             yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher)
     else:
-        assert fh.readable()  # expected by ReadOnlyBinary
+        assert fh.readable(), fh  # expected by ReadOnlyBinary
         # The following cast is safe since ReadOnlyBinary is a subset of the interfaces.
         yield UnzipWalkResult(names=fns, typ=FileType.FILE, hnd=cast(ReadOnlyBinary, fh))
 
@@ -436,7 +436,7 @@ def main(argv=None):
         else:
             names = tuple( str(n) for n in result.names )
             if result.typ==FileType.FILE and args.dump:
-                assert result.hnd is not None
+                assert result.hnd is not None, result
                 print(f"{result.typ.name} {names!r} {result.hnd.read()!r}")
             elif result.typ==FileType.FILE or args.all_files:
                 print(f"{result.typ.name} {names!r}")

@@ -141,34 +141,6 @@ Intended as a utility function for use when reading files produced by the `--che
 * **Raises:**
   [**ValueError**](https://docs.python.org/3/library/exceptions.html#ValueError) – If the line could not be parsed.
 
-<a id="unzipwalk.ReadOnlyBinary"></a>
-
-### *class* unzipwalk.ReadOnlyBinary(\*args, \*\*kwargs)
-
-Interface for the file handle (file object) used in [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
-
-The interface is the intersection of [`typing.BinaryIO`](https://docs.python.org/3/library/typing.html#typing.BinaryIO), [`gzip.GzipFile`](https://docs.python.org/3/library/gzip.html#gzip.GzipFile), and [`zipfile.ZipExtFile`](https://docs.python.org/3/library/zipfile.html#module-zipfile).
-Because [`gzip.GzipFile`](https://docs.python.org/3/library/gzip.html#gzip.GzipFile) doesn’t implement `.tell()`, that method isn’t available here.
-Whether the handle supports seeking depends on the underlying library.
-
-Note [`unzipwalk()`](#function-unzipwalk) automatically closes files.
-
-#### *property* name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
-
-#### close()
-
-#### *property* closed *: [bool](https://docs.python.org/3/library/functions.html#bool)*
-
-#### readable()
-
-#### read(n: [int](https://docs.python.org/3/library/functions.html#int) = -1)
-
-#### readline(limit: [int](https://docs.python.org/3/library/functions.html#int) = -1)
-
-#### seekable()
-
-#### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0)
-
 <a id="unzipwalk.FileType"></a>
 
 ### *class* unzipwalk.FileType(value)
@@ -219,6 +191,34 @@ in turn is stored in a Zip file:
 ...     print(fh.read())
 Hi, I'm a compressed file!
 ```
+
+<a id="unzipwalk.ReadOnlyBinary"></a>
+
+### *class* unzipwalk.ReadOnlyBinary(\*args, \*\*kwargs)
+
+Interface for the file handle (file object) used in [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
+
+The interface is the intersection of [`typing.BinaryIO`](https://docs.python.org/3/library/typing.html#typing.BinaryIO), [`gzip.GzipFile`](https://docs.python.org/3/library/gzip.html#gzip.GzipFile), and [`zipfile.ZipExtFile`](https://docs.python.org/3/library/zipfile.html#module-zipfile).
+Because [`gzip.GzipFile`](https://docs.python.org/3/library/gzip.html#gzip.GzipFile) doesn’t implement `.tell()`, that method isn’t available here.
+Whether the handle supports seeking depends on the underlying library.
+
+Note [`unzipwalk()`](#function-unzipwalk) automatically closes files.
+
+#### *property* name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+#### close()
+
+#### *property* closed *: [bool](https://docs.python.org/3/library/functions.html#bool)*
+
+#### readable()
+
+#### read(n: [int](https://docs.python.org/3/library/functions.html#int) = -1)
+
+#### readline(limit: [int](https://docs.python.org/3/library/functions.html#int) = -1)
+
+#### seekable()
+
+#### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0)
 
 ## Command-Line Interface
 
