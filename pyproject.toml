@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "unzipwalk"
 description = "Recursively walk into directories and archives"
-version = "1.4.0"
+version = "1.5.0"
 authors = [ { name="Hauke D", email="haukex@zero-g.net" } ]
 readme = "README.md"
 requires-python = ">=3.9"
@@ -90,7 +90,8 @@ output = "coverage.xml"
 
 [tool.flake8]
 extend-ignore = [
-    "E701", # Multiple statements on one line (colon)
+    # NOTE the following is commented out because otherwise `coverage`'s reports aren't always correct.
+    #"E701", # Multiple statements on one line (colon)
     "E262", # Inline comment should start with '# '
     "E265", # Block comment should start with '# '
     "E201", # Whitespace after '('
@@ -222,7 +223,7 @@ max-module-lines = 500
 single-line-class-stmt = true
 
 # Allow the body of an if to be on the same line as the test if there is no else.
-# NOTE I used to set this to `true`, but apparently `coverage` may then incorrectly report 100% coverage.
+# NOTE the following is now `false` because otherwise `coverage`'s reports aren't always correct.
 single-line-if-stmt = false
 
 [tool.pylint.imports]
@@ -252,7 +253,8 @@ disable = [
     "missing-function-docstring",
     "missing-class-docstring",
     "too-few-public-methods",
-    "multiple-statements",
+    # NOTE the following is commented out because otherwise `coverage`'s reports aren't always correct.
+    #"multiple-statements",
     "fixme"]
 
 # Enable the message, report, category or checker with the given id(s). You can

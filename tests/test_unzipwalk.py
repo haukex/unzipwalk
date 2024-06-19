@@ -31,6 +31,9 @@ import doctest
 import unittest
 from hashlib import sha1
 from copy import deepcopy
+from gzip import BadGzipFile
+from tarfile import TarError
+from zipfile import BadZipFile
 from unittest.mock import patch
 from typing import Optional, cast
 from tempfile import TemporaryDirectory, TemporaryFile
@@ -113,6 +116,7 @@ def load_tests(_loader, tests, _ignore):
 class UnzipWalkTestCase(unittest.TestCase):
 
     def setUp(self):
+        self.bad_zips = Path(__file__).parent.resolve()/'bad_zips'
         self.maxDiff = None  # pylint: disable=invalid-name
         self.tempdir = TemporaryDirectory()  # pylint: disable=consider-using-with
         testdir = Path(self.tempdir.name)/'zips'
@@ -147,21 +151,28 @@ class UnzipWalkTestCase(unittest.TestCase):
 
     def test_unzipwalk_matcher(self):
         # filter from the initial path list
-        self.assertEqual( [ r for r in self.expect_all if r[0][0].name != 'more.zip' ],
-            sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(os.curdir,
-                matcher=lambda p: p[0].stem.lower()!='more' ) ) )
+        self.assertEqual( sorted(
+                [ r for r in self.expect_all if r[0][0].name != 'more.zip' ] + [ ( (Path("more.zip"),), None, FileType.SKIP ) ]
+            ), sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r
+                in uut.unzipwalk(os.curdir, matcher=lambda p: p[0].stem.lower()!='more' ) ) )
         # filter from zip file
-        self.assertEqual( [ r for r in self.expect_all if r[0][-1].name != 'six.txt' ],
-            sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(os.curdir,
-                matcher=lambda p: p[-1].name.lower()!='six.txt' ) ) )
+        self.assertEqual( sorted(
+                [ r for r in self.expect_all if r[0][-1].name != 'six.txt' ]
+                + [ ( (Path("more.zip"), PurePosixPath("more/stuff/six.txt")), None, FileType.SKIP ) ]
+            ), sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r
+                in uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name.lower()!='six.txt' ) ) )
         # filter a gz file
-        self.assertEqual( [ r for r in self.expect_all if not ( r[0][0].name=='archive.tar.gz' and r[0][-1].name == 'world.txt' ) ],
-            sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(os.curdir,
-                matcher=lambda p: len(p)<2 or p[-2].as_posix()!='archive/world.txt.gz' ) ) )
+        self.assertEqual( sorted(
+                [ r for r in self.expect_all if not ( r[0][0].name=='archive.tar.gz' and len(r[0])>1 and r[0][1].name == 'world.txt.gz' ) ]
+                + [ ( (Path("archive.tar.gz"), PurePosixPath("archive/world.txt.gz")), None, FileType.SKIP ) ]
+            ), sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r
+                in uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2].as_posix()!='archive/world.txt.gz' ) ) )
         # filter from tar file
-        self.assertEqual( [ r for r in self.expect_all if not ( len(r[0])>1 and r[0][1].stem=='abc' ) ],
-            sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(os.curdir,
-                matcher=lambda p: p[-1].name != 'abc.zip' ) ) )
+        self.assertEqual( sorted(
+                [ r for r in self.expect_all if not ( len(r[0])>1 and r[0][1].stem=='abc' ) ]
+                + [ ( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip")), None, FileType.SKIP ) ]
+            ), sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r
+                in uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'abc.zip' ) ) )
 
     def test_recursive_open(self):
         for file in self.expect_all:
@@ -178,13 +189,16 @@ class UnzipWalkTestCase(unittest.TestCase):
             self.assertEqual( sha1(fh.read()).hexdigest(), '4d6be7a2e79c3341dd5c4fe669c0ca40a8765031' )
         # basic error
         with self.assertRaises(ValueError):
-            with uut.recursive_open(()): pass
+            with uut.recursive_open(()):
+                pass  # pragma: no cover
         # gzip bad filename
         with self.assertRaises(FileNotFoundError):
-            with uut.recursive_open(("archive.tar.gz", "archive/world.txt.gz", "archive/bang.txt")): pass
+            with uut.recursive_open(("archive.tar.gz", "archive/world.txt.gz", "archive/bang.txt")):
+                pass  # pragma: no cover
         # TarFile.extractfile: attempt to open a directory
         with self.assertRaises(FileNotFoundError):
-            with uut.recursive_open(("archive.tar.gz", "archive/test2/")): pass
+            with uut.recursive_open(("archive.tar.gz", "archive/test2/")):
+                pass  # pragma: no cover
 
     def test_result_validate(self):
         with self.assertRaises(ValueError):
@@ -251,15 +265,78 @@ class UnzipWalkTestCase(unittest.TestCase):
         self.assertEqual( uut.decode_tuple('( "foo" , \'bar\' ) '), ('foo','bar') )
         self.assertEqual( uut.decode_tuple("('hello',)"), ('hello',) )
         self.assertEqual( uut.decode_tuple('"foo","bar"'), ('foo','bar') )
-        with self.assertRaises(ValueError): uut.decode_tuple('')
-        with self.assertRaises(ValueError): uut.decode_tuple('X=("foo",)')
-        with self.assertRaises(ValueError): uut.decode_tuple('(')
-        with self.assertRaises(ValueError): uut.decode_tuple('()')
-        with self.assertRaises(ValueError): uut.decode_tuple('("foo")')
-        with self.assertRaises(ValueError): uut.decode_tuple('("foo","bar",3)')
-        with self.assertRaises(ValueError): uut.decode_tuple('("foo","bar",str)')
-        with self.assertRaises(ValueError): uut.decode_tuple('("foo","bar","x"+"y")')
-        with self.assertRaises(ValueError): uut.decode_tuple('["foo","bar"]')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('X=("foo",)')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('(')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('()')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('("foo")')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('("foo","bar",3)')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('("foo","bar",str)')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('("foo","bar","x"+"y")')
+        with self.assertRaises(ValueError):
+            uut.decode_tuple('["foo","bar"]')
+
+    def test_errors(self):
+        with self.assertRaises(BadZipFile):
+            list(uut.unzipwalk(self.bad_zips/'not_a.zip'))
+        with self.assertRaises(TarError):
+            list(uut.unzipwalk(self.bad_zips/'not_a.tgz'))
+        with self.assertRaises(BadGzipFile):
+            list(uut.unzipwalk(self.bad_zips/'not_a.tgz.gz'))
+        with self.assertRaises(BadZipFile):
+            list(uut.unzipwalk(self.bad_zips/'not_a.zip.gz'))
+        with self.assertRaises(RuntimeError):
+            list(uut.unzipwalk(self.bad_zips/'features.zip'))
+        # the following is commented out due to https://github.com/python/cpython/issues/120740
+        #with self.assertRaises(TarError):
+        #    list(uut.unzipwalk(pth/'bad.tar.gz'))
+        self.assertEqual( sorted( (r.names, None if r.hnd is None or r.names[0].name=='not_a.gz' else r.hnd.read(), r.typ) for r
+               in uut.unzipwalk( (self.bad_zips, Path('does_not_exist')) , raise_errors=False) ),
+            sorted( [
+                 ( (Path("does_not_exist"),), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.gz",), None, FileType.ARCHIVE ),
+                 ( (self.bad_zips/"not_a.gz", self.bad_zips/"not_a"), None, FileType.FILE ),  # no error until the file is read (tested below)
+                 ( (self.bad_zips/"not_a.tar",), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.tar.gz",), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.tgz",), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.zip",), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.tgz.gz",), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.zip.gz",), None, FileType.ARCHIVE ),
+                 ( (self.bad_zips/"not_a.zip.gz", self.bad_zips/"not_a.zip"), None, FileType.ERROR ),
+                 ( (self.bad_zips/"features.zip",), None, FileType.ARCHIVE ),
+                 ( (self.bad_zips/"features.zip", PurePosixPath("spiral.pl")), None, FileType.ERROR ),  # unsupported compression method
+                 ( (self.bad_zips/"features.zip", PurePosixPath("foo.txt")), b'Top Secret\n', FileType.FILE ),
+                 ( (self.bad_zips/"features.zip", PurePosixPath("bar.txt")), None, FileType.ERROR ),  # encrypted
+                 ( (self.bad_zips/"bad.tar.gz",), None, FileType.ARCHIVE ),
+                 ( (self.bad_zips/"bad.tar.gz", PurePosixPath("a")), b'One\n', FileType.FILE ),
+                 # the following is commented out due to https://github.com/python/cpython/issues/120740
+                 #( (pth/"bad.tar.gz", PurePosixPath("b")), None, FileType.ERROR ),  # bad checksum
+                 #( (pth/"bad.tar.gz", PurePosixPath("c")), b'Three\n', FileType.FILE ),
+            ] ) )
+        with self.assertRaises(BadGzipFile):
+            for r in uut.unzipwalk((self.bad_zips/'not_a.gz'), raise_errors=False):  # pragma: no branch
+                if r.hnd is not None:  # pragma: no branch
+                    r.hnd.read()
+
+    @unittest.skipIf(condition=not sys.platform.startswith('linux'), reason='only on Linux')
+    def test_errors_linux(self):  # pragma: no cover  (only runs on Linux)
+        with TemporaryDirectory() as td:
+            f = Path(td)/'foo'
+            f.touch()
+            f.chmod(0)
+            with self.assertRaises(PermissionError):
+                list(uut.unzipwalk(td))
+            self.assertEqual(
+                sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r in uut.unzipwalk(td, raise_errors=False) ),
+                sorted( [ ( (f,), None, FileType.ERROR ), ] ) )
 
     def _run_cli(self, argv :list[str]) -> list[str]:
         sys.argv = [os.path.basename(uut.__file__)] + argv
@@ -295,3 +372,50 @@ class UnzipWalkTestCase(unittest.TestCase):
         self.assertEqual( self._run_cli(['-e','world.*','--exclude=*abc*']), sorted(  # exclude
             f"FILE {tuple(str(n) for n in e[0])!r}" for e in self.expect_all if e[2]==FileType.FILE
             and not ( e[0][-1].name.startswith('world.') or len(e[0])>1 and e[0][1].name=='abc.zip' ) ) )
+
+    def test_cli_errors(self):
+        os.chdir(self.bad_zips)
+        self.assertEqual( self._run_cli(['-d','.','does_not_exist']), sorted( [
+            "ERROR ('does_not_exist',)",
+            "ERROR ('not_a.gz', 'not_a')",
+            "ERROR ('not_a.tar',)",
+            "ERROR ('not_a.tar.gz',)",
+            "ERROR ('not_a.tgz',)",
+            "ERROR ('not_a.zip',)",
+            "ERROR ('not_a.tgz.gz',)",
+            "ERROR ('not_a.zip.gz', 'not_a.zip')",
+            "ERROR ('features.zip', 'spiral.pl')",
+            "ERROR ('features.zip', 'bar.txt')",
+            "FILE ('features.zip', 'foo.txt') b'Top Secret\\n'",
+            "FILE ('bad.tar.gz', 'a') b'One\\n'",
+            # the following is commented out due to https://github.com/python/cpython/issues/120740
+            #"ERROR ('bad.tar.gz', 'b')",
+            #"FILE ('bad.tar.gz', 'c') b'Three\\n'",
+        ] ) )
+        self.assertEqual( self._run_cli(['-cmd5','.','does_not_exist']), sorted( [
+            "# ERROR does_not_exist",
+            "# ERROR ('not_a.gz', 'not_a')",
+            "# ERROR not_a.tar",
+            "# ERROR not_a.tar.gz",
+            "# ERROR not_a.tgz",
+            "# ERROR not_a.zip",
+            "# ERROR not_a.tgz.gz",
+            "# ERROR ('not_a.zip.gz', 'not_a.zip')",
+            "# ERROR ('features.zip', 'spiral.pl')",
+            "# ERROR ('features.zip', 'bar.txt')",
+            "f0294cd41b8a0a0c403911bb212d9edf *('features.zip', 'foo.txt')",
+            "b602183573352abf933bc7ca85fd0629 *('bad.tar.gz', 'a')",
+            # the following is commented out due to https://github.com/python/cpython/issues/120740
+            #"# ERROR ('bad.tar.gz', 'b')",
+            #"38a460ffb4cfb15460b4b679ce534181 *('bad.tar.gz', 'c')",
+        ] ) )
+        with self.assertRaises(BadGzipFile):
+            self._run_cli(['-rd','not_a.gz'])
+        with self.assertRaises(BadGzipFile):
+            self._run_cli(['-rcmd5','not_a.gz'])
+        with self.assertRaises(BadZipFile):
+            self._run_cli(['-r','not_a.zip'])
+        with self.assertRaises(TarError):
+            self._run_cli(['-r','not_a.tgz'])
+        with self.assertRaises(RuntimeError):
+            self._run_cli(['-r','features.zip'])

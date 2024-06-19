@@ -56,11 +56,11 @@ For example, to read all CSV files in the current directory and below, including
 ['42', 'Hello', 'World']
 ```
 
-## Members
+## API
 
 <a id="function-unzipwalk"></a>
 
-### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath)]], [bool](https://docs.python.org/3/library/functions.html#bool)] | [None](https://docs.python.org/3/library/constants.html#None) = None)
+### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath)]], [bool](https://docs.python.org/3/library/functions.html#bool)] | [None](https://docs.python.org/3/library/constants.html#None) = None, raise_errors: [bool](https://docs.python.org/3/library/functions.html#bool) = True)
 
 This generator recursively walks into directories and compressed files and yields named tuples of type [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
 
@@ -68,6 +68,15 @@ This generator recursively walks into directories and compressed files and yield
   * **paths** – A filename or iterable of filenames.
   * **matcher** – When you provide this optional argument, it must be a callable that accepts a sequence of paths
     as its only argument, and returns a boolean value whether this filename should be further processed or not.
+    If a file is skipped, a [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.SKIP`](#unzipwalk.FileType) is yielded.
+  * **raise_errors** – When this is turned on (the default), any errors are raised immediately, aborting the iteration.
+    If this is turned off, when decompression errors occur,
+    a [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.ERROR`](#unzipwalk.FileType) is yielded for those files instead.
+    **However,** be aware that [`gzip.BadGzipFile`](https://docs.python.org/3/library/gzip.html#gzip.BadGzipFile) errors are not raised until the file is actually read,
+    so you’d need to add an exception handler around your read() call to handle such cases.
+
+#### NOTE
+Do not rely on the order of results!
 
 <a id="unzipwalk.UnzipWalkResult"></a>
 
@@ -105,15 +114,15 @@ Intended for internal use, mainly when type checkers are not being used.
 
 <a id="unzipwalk.UnzipWalkResult.checksum_line"></a>
 
-#### checksum_line(hash_algo: [str](https://docs.python.org/3/library/stdtypes.html#str))
+#### checksum_line(hash_algo: [str](https://docs.python.org/3/library/stdtypes.html#str), \*, raise_errors: [bool](https://docs.python.org/3/library/functions.html#bool) = True)
 
 Encodes this object into a line of text suitable for use as a checksum line.
 
 Intended mostly for internal use by the `--checksum` CLI option.
+See [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line) for the inverse operation.
 
-**Warning:** Requires that the file handle be open (for files), and will read from it!
-
-See also [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line) for the inverse operation.
+#### WARNING
+Requires that the file handle be open (for files), and will read from it to generate the checksum!
 
 * **Parameters:**
   **hash_algo** – The hashing algorithm to use, as recognized by [`hashlib.new()`](https://docs.python.org/3/library/hashlib.html#hashlib.new).
@@ -126,11 +135,12 @@ See also [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line)
 
 Decodes a checksum line as produced by [`checksum_line()`](#unzipwalk.UnzipWalkResult.checksum_line).
 
-**Warning:** The `hnd` of the returned object will *not* be a handle to
+Intended as a utility function for use when reading files produced by the `--checksum` CLI option.
+
+#### WARNING
+The `hnd` of the returned object will *not* be a handle to
 the data from the file, instead it will be a handle to read the checksum of the file!
 (You could use [`recursive_open()`](#unzipwalk.recursive_open) to open the files themselves.)
-
-Intended as a utility function for use when reading files produced by the `--checksum` CLI option.
 
 * **Parameters:**
   * **line** – The line to parse.
@@ -147,25 +157,36 @@ Intended as a utility function for use when reading files produced by the `--che
 
 Used in [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) to indicate the type of the file.
 
-#### FILE *= 0*
+#### WARNING
+Don’t rely on the numeric value of the enum elements, they are automatically generated and may change!
+
+#### FILE *= 1*
 
 A regular file.
 
-#### ARCHIVE *= 1*
+#### ARCHIVE *= 2*
 
 An archive file, will be descended into.
 
-#### DIR *= 2*
+#### DIR *= 3*
 
 A directory.
 
-#### SYMLINK *= 3*
+#### SYMLINK *= 4*
 
 A symbolic link.
 
-#### OTHER *= 4*
+#### OTHER *= 5*
 
 Some other file type (e.g. FIFO).
+
+#### SKIP *= 6*
+
+A file was skipped due to the `matcher` filter.
+
+#### ERROR *= 7*
+
+An error was encountered with this file, when the `raise_errors` option is off.
 
 <a id="unzipwalk.recursive_open"></a>
 
@@ -223,7 +244,7 @@ Note [`unzipwalk()`](#function-unzipwalk) automatically closes files.
 ## Command-Line Interface
 
 ```default
-usage: unzipwalk [-h] [-a] [-d | -c ALGO] [-e EXCLUDE] [PATH ...]
+usage: unzipwalk [-h] [-a] [-d | -c ALGO] [-e EXCLUDE] [-r] [PATH ...]
 
 Recursively walk into directories and archives
 
@@ -238,6 +259,7 @@ optional arguments:
                         generate a checksum for each file**
   -e EXCLUDE, --exclude EXCLUDE
                         filename globs to exclude*
+  -r, --raise-errors    raise errors instead of reporting them in output
 
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future
