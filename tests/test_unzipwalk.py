@@ -353,8 +353,13 @@ class UnzipWalkTestCase(unittest.TestCase):
         return lines
 
     def test_cli(self):
-        self.assertEqual( self._run_cli([]), sorted(  # basic
-            f"FILE {tuple(str(n) for n in e[0])!r}" for e in self.expect_all if e[2]==FileType.FILE ) )
+        exp_basic = sorted( f"FILE {tuple(str(n) for n in e[0])!r}" for e in self.expect_all if e[2]==FileType.FILE )
+        self.assertEqual( self._run_cli([]), exp_basic )  # basic
+        with TemporaryDirectory() as td:  # --outfile
+            tf = Path(td)/'foo'
+            self.assertEqual( self._run_cli(['--outfile', str(tf)]), [] )
+            with tf.open(encoding='UTF-8') as fh:
+                self.assertEqual( sorted(fh.read().splitlines()), exp_basic )
         self.assertEqual( self._run_cli(['--all-files']), sorted(  # basic + all-files
             f"{e[2].name} {tuple(str(n) for n in e[0])!r}" for e in self.expect_all ) )
         self.assertEqual( self._run_cli(['--dump']), sorted(  # dump

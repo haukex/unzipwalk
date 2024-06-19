@@ -244,7 +244,8 @@ Note [`unzipwalk()`](#function-unzipwalk) automatically closes files.
 ## Command-Line Interface
 
 ```default
-usage: unzipwalk [-h] [-a] [-d | -c ALGO] [-e EXCLUDE] [-r] [PATH ...]
+usage: unzipwalk [-h] [-a] [-d | -c ALGO] [-e EXCLUDE] [-r] [-o OUTFILE]
+                 [PATH ...]
 
 Recursively walk into directories and archives
 
@@ -260,6 +261,8 @@ optional arguments:
   -e EXCLUDE, --exclude EXCLUDE
                         filename globs to exclude*
   -r, --raise-errors    raise errors instead of reporting them in output
+  -o OUTFILE, --outfile OUTFILE
+                        output filename
 
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future

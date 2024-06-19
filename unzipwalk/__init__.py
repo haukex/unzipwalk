@@ -100,6 +100,7 @@ along with this program. If not, see https://www.gnu.org/licenses/
 """
 import re
 import io
+import sys
 import ast
 import stat
 import zlib
@@ -495,8 +496,18 @@ def _arg_parser():
     group.add_argument('-c','--checksum', help="generate a checksum for each file**", choices=hashlib.algorithms_available, metavar="ALGO")
     parser.add_argument('-e', '--exclude', help="filename globs to exclude*", action="append", default=[])
     parser.add_argument('-r', '--raise-errors', help="raise errors instead of reporting them in output", action="store_true")
+    parser.add_argument('-o', '--outfile', help="output filename")
     parser.add_argument('paths', metavar='PATH', help='paths to process (default is current directory)', nargs='*')
     return parser
+
+@contextmanager
+def _open(filename :Optional[Filename]):
+    """Apparently needs to be in its own context manager (instead of using nullcontext) so the type checkers are happy."""
+    if filename and filename != '-':
+        with open(filename, 'x', encoding='UTF-8') as fh:
+            yield fh
+    else:
+        yield sys.stdout
 
 def main(argv=None):
     igbpyutils.error.init_handlers()
@@ -505,22 +516,23 @@ def main(argv=None):
     def matcher(paths :Sequence[PurePath]) -> bool:
         return not any( fnmatch(paths[-1].name, pat) for pat in args.exclude )
     report = (FileType.FILE, FileType.ERROR)
-    for result in unzipwalk( args.paths if args.paths else Path(), matcher=matcher, raise_errors=args.raise_errors ):
-        if args.checksum:
-            if result.typ in report or args.all_files:
-                print(result.checksum_line(args.checksum, raise_errors=args.raise_errors))
-        else:
-            names = tuple( str(n) for n in result.names )
-            if result.typ == FileType.FILE and args.dump:
-                assert result.hnd is not None, result
-                try:
-                    data = result.hnd.read()
-                except BadGzipFile:
-                    if args.raise_errors:
-                        raise
-                    print(f"{FileType.ERROR.name} {names!r}")
-                else:
-                    print(f"{result.typ.name} {names!r} {data!r}")
-            elif result.typ in report or args.all_files:
-                print(f"{result.typ.name} {names!r}")
+    with _open(args.outfile) as fh:
+        for result in unzipwalk( args.paths if args.paths else Path(), matcher=matcher, raise_errors=args.raise_errors ):
+            if args.checksum:
+                if result.typ in report or args.all_files:
+                    print(result.checksum_line(args.checksum, raise_errors=args.raise_errors), file=fh)
+            else:
+                names = tuple( str(n) for n in result.names )
+                if result.typ == FileType.FILE and args.dump:
+                    assert result.hnd is not None, result
+                    try:
+                        data = result.hnd.read()
+                    except BadGzipFile:
+                        if args.raise_errors:
+                            raise
+                        print(f"{FileType.ERROR.name} {names!r}", file=fh)
+                    else:
+                        print(f"{result.typ.name} {names!r} {data!r}", file=fh)
+                elif result.typ in report or args.all_files:
+                    print(f"{result.typ.name} {names!r}", file=fh)
     parser.exit(0)

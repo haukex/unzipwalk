@@ -1,8 +1,15 @@
 Changelog for unzipwalk
 =======================
 
+1.6.0 - Wed, Jun 19 2024
+------------------------
+
+- Added `--outfile` CLI option
+
 1.5.0 - Wed, Jun 19 2024
 ------------------------
+
+`commit 43e2481c8ae71733d84b930ad989db67ce6cb5d2`
 
 - Added `raise_errors` option that can be turned off so that errors during iteration don't abort the walk,
   and instead a `UnzipWalkResult` of type `FileType.ERROR` is yielded.
