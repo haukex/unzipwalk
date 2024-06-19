@@ -10,6 +10,7 @@ Changelog for unzipwalk
   - When `matcher` is used, previously the results would be entirely suppressed, now a `UnzipWalkResult` of type `FileType.SKIP` is yielded.
   - The CLI tool now defaults to `raise_errors` being off; you must specify `--raise-errors` to get the previous behavior.
   - The CLI tool now defaults to reporting `ERROR` and `FILE` results instead of just `FILE` results.
+- Package `unzipwalk` now has a `__main__.py` so you can invoke the CLI tool with `python3 -m unzipwalk` as well
 
 1.4.0 - Mon, Jun 17 2024
 ------------------------
