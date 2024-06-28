@@ -457,7 +457,8 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
         **However,** be aware that :exc:`gzip.BadGzipFile` errors are not raised until the file is actually read,
         so you'd need to add an exception handler around your `read()` call to handle such cases.
 
-    .. note:: Do not rely on the order of results!
+    .. note:: Do not rely on the order of results! But see also the discussion in the main documentation about why
+        e.g. ``sorted(unzipwalk(...))`` automatically closes files and so may not be what you want.
     """
     def handle(p :Path):
         try:

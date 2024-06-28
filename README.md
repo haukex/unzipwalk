@@ -81,7 +81,8 @@ This generator recursively walks into directories and compressed files and yield
     so you’d need to add an exception handler around your read() call to handle such cases.
 
 #### NOTE
-Do not rely on the order of results!
+Do not rely on the order of results! But see also the discussion in the main documentation about why
+e.g. `sorted(unzipwalk(...))` automatically closes files and so may not be what you want.
 
 <a id="unzipwalk.UnzipWalkResult"></a>
 
