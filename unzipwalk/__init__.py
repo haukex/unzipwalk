@@ -53,6 +53,11 @@ For example, to read all CSV files in the current directory and below, including
     ['Id', 'Name', 'Address']
     ['42', 'Hello', 'World']
 
+.. seealso::
+    - `zipfile Issues <https://github.com/orgs/python/projects/7>`_
+    - `tarfile Issues <https://github.com/orgs/python/projects/11>`_
+    - `gzip Issues <https://github.com/orgs/python/projects/20/views/2>`_
+
 API
 ---
 

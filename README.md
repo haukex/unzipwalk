@@ -56,6 +56,11 @@ For example, to read all CSV files in the current directory and below, including
 ['42', 'Hello', 'World']
 ```
 
+#### SEE ALSO
+- [zipfile Issues](https://github.com/orgs/python/projects/7)
+- [tarfile Issues](https://github.com/orgs/python/projects/11)
+- [gzip Issues](https://github.com/orgs/python/projects/20/views/2)
+
 ## API
 
 <a id="function-unzipwalk"></a>
@@ -267,9 +272,9 @@ optional arguments:
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future
 versions. For more control, use the library instead of this command-line tool.
-** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, sha1, sha224,
-sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512, sha512_224,
-sha512_256, shake_128, shake_256, sm3
+** Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, mdc2,
+ripemd160, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384,
+sha3_512, sha512, sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.
