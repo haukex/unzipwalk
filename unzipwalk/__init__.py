@@ -58,6 +58,12 @@ For example, to read all CSV files in the current directory and below, including
     - `tarfile Issues <https://github.com/orgs/python/projects/11>`_
     - `gzip Issues <https://github.com/orgs/python/projects/20/views/2>`_
 
+.. note::
+    The original name of a gzip-compressed file is derived from the compressed file's name
+    by simply removing the ``.gz`` extension. Using the original filename from the gzip
+    file's header is currently not possible due to
+    `limitations in the underlying library <https://github.com/python/cpython/issues/71638>`_.
+
 API
 ---
 
