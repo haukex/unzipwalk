@@ -2,6 +2,7 @@
 # https://www.gnu.org/software/make/manual/make.html
 
 py_code_locs = unzipwalk tests docs/*.py docs/_ext/*.py
+# Hint: $(filter-out whatever,$(py_code_locs))
 # Remember to keep in sync with GitHub Actions workflows:
 requirement_txts = requirements.txt dev/requirements.txt docs/requirements.txt
 perm_checks = ./* .gitignore .vscode .github
@@ -34,7 +35,7 @@ installdeps:  ## Install project dependencies
 	@set -euxo pipefail
 	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location pip wheel
 	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location $(foreach x,$(requirement_txts),-r $(x))
-	pre-commit install -c dev/pre-commit.yml
+	$(PYTHON3BIN) -m pre_commit install -c dev/pre-commit.yml
 	# for modules/packages:
 	# $(PYTHON3BIN) -m pip install --editable .
 
@@ -77,16 +78,18 @@ ver-checks:  ## Checks that depend on the Python version
 	@set -euxo pipefail
 	# https://microsoft.github.io/pyright/#/command-line
 	npx pyright --project pyproject.toml --pythonpath "$$( $(PYTHON3BIN) -c 'import sys; print(sys.executable)' )" $(py_code_locs)
-	mypy --config-file pyproject.toml $(py_code_locs)
+	$(PYTHON3BIN) -m mypy --config-file pyproject.toml $(py_code_locs)
 	# Note I'm not sure if the following are actually version-dependent, but because they parse the Python code, I'll leave them here.
-	flake8 --toml-config=pyproject.toml $(py_code_locs)
-	pylint --rcfile=pyproject.toml --recursive=y $(py_code_locs)
+	$(PYTHON3BIN) -m flake8 --toml-config=pyproject.toml $(py_code_locs)
+	#TODO Later: The following is a workaround for https://github.com/pylint-dev/pylint/issues/10000 (on Python 3.13.0rc3), remove when fixed
+	ISPY13RC="$$( $(PYTHON3BIN) --version | perl -ne 'print "yes" if /Python 3\.13\.0rc/' )"
+	$(PYTHON3BIN) -m pylint --rcfile=pyproject.toml $${ISPY13RC:+"--disable=no-name-in-module"} --recursive=y $(py_code_locs)
 
 other-checks:  ## Checks not depending on the Python version
 	@set -euxo pipefail
-	pre-commit run -c dev/pre-commit.yml --all-files
+	$(PYTHON3BIN) -m pre_commit run -c dev/pre-commit.yml --all-files
 	# note the following is on one line b/c GitHub macOS Action Runners are running bash 3.2 and the multiline version didn't work there...
-	for REQ in $(requirement_txts); do pur --skip-gt --dry-run-changed --nonzero-exit-code -r "$$REQ"; done
+	for REQ in $(requirement_txts); do $(PYTHON3BIN) -m pur --skip-gt --dry-run-changed --nonzero-exit-code -r "$$REQ"; done
 
 unittest:  ## Run unit tests
 	@PYTHONDEVMODE=1 PYTHONWARNINGS=error PYTHONWARNDEFAULTENCODING=1 $(PYTHON3BIN) -m unittest -v
