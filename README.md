@@ -71,7 +71,7 @@ file’s header is currently not possible due to
 
 <a id="function-unzipwalk"></a>
 
-### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath)]], [bool](https://docs.python.org/3/library/functions.html#bool)] | [None](https://docs.python.org/3/library/constants.html#None) = None, raise_errors: [bool](https://docs.python.org/3/library/functions.html#bool) = True)
+### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike) | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath)]], [bool](https://docs.python.org/3/library/functions.html#bool)] | [None](https://docs.python.org/3/library/constants.html#None) = None, raise_errors: [bool](https://docs.python.org/3/library/functions.html#bool) = True) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[UnzipWalkResult](#unzipwalk.UnzipWalkResult), [None](https://docs.python.org/3/library/constants.html#None), [None](https://docs.python.org/3/library/constants.html#None)]
 
 This generator recursively walks into directories and compressed files and yields named tuples of type [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
 
@@ -126,7 +126,7 @@ Intended for internal use, mainly when type checkers are not being used.
 
 <a id="unzipwalk.UnzipWalkResult.checksum_line"></a>
 
-#### checksum_line(hash_algo: [str](https://docs.python.org/3/library/stdtypes.html#str), \*, raise_errors: [bool](https://docs.python.org/3/library/functions.html#bool) = True)
+#### checksum_line(hash_algo: [str](https://docs.python.org/3/library/stdtypes.html#str), \*, raise_errors: [bool](https://docs.python.org/3/library/functions.html#bool) = True) → [str](https://docs.python.org/3/library/stdtypes.html#str)
 
 Encodes this object into a line of text suitable for use as a checksum line.
 
@@ -143,7 +143,7 @@ Requires that the file handle be open (for files), and will read from it to gene
 
 <a id="unzipwalk.UnzipWalkResult.from_checksum_line"></a>
 
-#### *classmethod* from_checksum_line(line: [str](https://docs.python.org/3/library/stdtypes.html#str), \*, windows: [bool](https://docs.python.org/3/library/functions.html#bool) = False)
+#### *classmethod* from_checksum_line(line: [str](https://docs.python.org/3/library/stdtypes.html#str), \*, windows: [bool](https://docs.python.org/3/library/functions.html#bool) = False) → [UnzipWalkResult](#unzipwalk.UnzipWalkResult) | [None](https://docs.python.org/3/library/constants.html#None)
 
 Decodes a checksum line as produced by [`checksum_line()`](#unzipwalk.UnzipWalkResult.checksum_line).
 
@@ -202,7 +202,7 @@ An error was encountered with this file, when the `raise_errors` option is off.
 
 <a id="unzipwalk.recursive_open"></a>
 
-### unzipwalk.recursive_open(fns: [Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)], encoding=None, errors=None, newline=None)
+### unzipwalk.recursive_open(fns: [Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)], encoding=None, errors=None, newline=None) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | TextIOWrapper, [None](https://docs.python.org/3/library/constants.html#None), [None](https://docs.python.org/3/library/constants.html#None)]
 
 This context manager allows opening files nested inside archives directly.
 
@@ -239,19 +239,19 @@ Note [`unzipwalk()`](#function-unzipwalk) automatically closes files.
 
 #### *property* name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
-#### close()
+#### close() → [None](https://docs.python.org/3/library/constants.html#None)
 
 #### *property* closed *: [bool](https://docs.python.org/3/library/functions.html#bool)*
 
-#### readable()
+#### readable() → [Literal](https://docs.python.org/3/library/typing.html#typing.Literal)[True]
 
-#### read(n: [int](https://docs.python.org/3/library/functions.html#int) = -1)
+#### read(n: [int](https://docs.python.org/3/library/functions.html#int) = -1) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
 
-#### readline(limit: [int](https://docs.python.org/3/library/functions.html#int) = -1)
+#### readline(limit: [int](https://docs.python.org/3/library/functions.html#int) = -1) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
 
-#### seekable()
+#### seekable() → [bool](https://docs.python.org/3/library/functions.html#bool)
 
-#### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0)
+#### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0) → [int](https://docs.python.org/3/library/functions.html#int)
 
 ## Command-Line Interface
 
@@ -279,9 +279,9 @@ optional arguments:
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future
 versions. For more control, use the library instead of this command-line tool.
-** Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, mdc2,
-ripemd160, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384,
-sha3_512, sha512, sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
+** Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, ripemd160,
+sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
+sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.

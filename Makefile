@@ -6,10 +6,8 @@ py_code_locs = unzipwalk tests docs/*.py docs/_ext/*.py
 requirement_txts = requirements.txt dev/requirements.txt docs/requirements.txt
 perm_checks = ./* .gitignore .vscode .github
 
-# Remember venv only sets up the `python3` alias if it was called from `python3`,
-# so it's generally more reliable to call `python` instead, though on some old
-# systems that may still refer to Python 2 (`sudo apt-get install python-is-python3`).
-PYTHON3BIN = python  # user can change this on the `make` command line
+# The user can change the following on the command line, but note that some tools below won't use this variable!
+PYTHON3BIN = python
 
 .PHONY: help tasklist installdeps test
 .PHONY: smoke-checks nix-checks shellcheck ver-checks other-checks coverage unittest
@@ -43,6 +41,9 @@ installdeps:  ## Install project dependencies
 smoke-checks:  ## Basic smoke tests
 	@set -euxo pipefail
 	# example: [[ "$$OSTYPE" =~ linux.* ]]  # this project only runs on Linux
+	# make sure that PYTHON3BIN and `python3` refer to the same Python (on some old systems `python` is still Python 2 - `sudo apt-get install python-is-python3`)
+	[[ "$$( $(PYTHON3BIN) -c 'import sys; print(sys.exec_prefix+" "+sys.version.replace("\n",""))' )" == "$$( python3 -c 'import sys; print(sys.exec_prefix+" "+sys.version.replace("\n",""))' )"  ]]
+	# make sure we're on Python 3
 	[[ "$$($(PYTHON3BIN) --version)" =~ ^Python\ 3\. ]]
 
 nix-checks:  ## Checks that depend on a *NIX OS/FS
@@ -99,7 +100,7 @@ coverage:  ## Run unit tests with coverage
 	$(PYTHON3BIN) -m coverage xml --rcfile=pyproject.toml
 	set +x
 	# We don't use --fail_under=100 above because then the report won't be written.
-	# Also, the GitHub macOS runners didn't like the following (probably due to the old bash),
+	# Also, the GitHub macOS runners didn't like doing the following check in bash (probably due to the old bash),
 	# so we'll just hand it off to Perl:
 	$(PYTHON3BIN) -m coverage json --rcfile=pyproject.toml -o- | jq .totals.percent_covered \
 		| perl -wMstrict -0777 -MTerm::ANSIColor=colored -ne \
