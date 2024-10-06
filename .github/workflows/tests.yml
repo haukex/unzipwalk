@@ -1,6 +1,10 @@
 # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
 name: Python Tests, Lint, and Coverage
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
 jobs:
   tests:
     name: CPython ${{ matrix.python-version }} on ${{ matrix.os }}
@@ -34,13 +38,19 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             dev/requirements.txt
+      - name: set PY_VER_HASH
+        run: echo "PY_VER_HASH=$(python -VV | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
+      - id: cache-pre-commit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit|${{ env.PY_VER_HASH }}|${{ hashFiles('dev/pre-commit.yml') }}
       - name: Install dependencies
         run: make installdeps
       - name: Run checks and lint
         run: make smoke-checks ver-checks
       - name: Run version-independent checks
         if: ${{ matrix.python-version == '3.12' }}
-        #TODO Later: pre-commit downloads its deps each time - https://pre-commit.com/#github-actions-example
         run: make other-checks
       - name: Run nix-checks and shellcheck on Linux
         if: ${{ matrix.os == 'Ubuntu' }}

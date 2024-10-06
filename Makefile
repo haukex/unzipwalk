@@ -61,7 +61,7 @@ nix-checks:  ## Checks that depend on a *NIX OS/FS
 		else  # we can probably depend on permission bits being correct
 			UNRELIABLE_PERMS=""
 			set -x
-			simple-perms -r $(perm_checks)  # if this errors, run `simple-perms -m ...` for auto fix
+			$(PYTHON3BIN) -m simple_perms -r $(perm_checks)  # if this errors, run `simple-perms -m ...` for auto fix
 			test -z "$$( find . \( -type d -name '.venv*' -prune \) -o \( -iname '*.sh' ! -executable -print \) )"
 		fi
 	fi
