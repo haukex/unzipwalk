@@ -115,6 +115,7 @@ max-line-length = 150
 # ##### ##### ##### ##### ##### https://mypy.readthedocs.io/en/stable/config_file.html ##### ##### ##### ##### #####
 
 [tool.mypy]
+enable_error_code = [ "ignore-without-code" ]
 ignore_missing_imports = true
 check_untyped_defs = true
 #disallow_incomplete_defs = true  # This would require a lot of `-> None` and such
