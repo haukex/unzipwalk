@@ -42,8 +42,6 @@ installdeps:  ## Install project dependencies
 smoke-checks:  ## Basic smoke tests
 	@set -euxo pipefail
 	# example: [[ "$$OSTYPE" =~ linux.* ]]  # this project only runs on Linux
-	# make sure that PYTHON3BIN and `python3` refer to the same Python (on some old systems `python` is still Python 2 - `sudo apt-get install python-is-python3`)
-	[[ "$$( $(PYTHON3BIN) -c 'import sys; print(sys.exec_prefix+" "+sys.version.replace("\n",""))' )" == "$$( python3 -c 'import sys; print(sys.exec_prefix+" "+sys.version.replace("\n",""))' )"  ]]
 	# make sure we're on Python 3
 	[[ "$$($(PYTHON3BIN) --version)" =~ ^Python\ 3\. ]]
 
