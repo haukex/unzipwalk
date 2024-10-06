@@ -21,7 +21,6 @@ jobs:
         # https://github.com/actions/checkout/issues/135
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
-      #TODO Later: Installing pyright takes a long time on the GH Windows runners
       - uses: actions/setup-node@v4
         with:
           node-version: 20
