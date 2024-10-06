@@ -30,7 +30,7 @@ shift $((OPTIND-1))
 
 activate_venv () {
     echo "+ . $VENV_PATH/.venv$1/{Scripts,bin}/activate"
-    # Remember venv only sets up the `python` alias, not `python3`
+    # Remember venv may only set up the `python` alias, not necessarily `python3`
     if [ -e "$VENV_PATH/.venv$1/Scripts" ]; then
         # shellcheck source=/dev/null
         . "$VENV_PATH/.venv$1/Scripts/activate"
