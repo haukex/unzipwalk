@@ -39,7 +39,7 @@ jobs:
             requirements.txt
             dev/requirements.txt
       - name: set PY_VER_HASH
-        run: echo "PY_VER_HASH=$(python -VV | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
+        run: echo "PY_VER_HASH=$(python -VV | perl -wMstrict -MDigest::SHA=sha256_hex -0777 -pe '$_=sha256_hex($_)')" >> $GITHUB_ENV
       - id: cache-pre-commit
         uses: actions/cache@v4
         with:
