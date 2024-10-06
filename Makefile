@@ -81,9 +81,7 @@ ver-checks:  ## Checks that depend on the Python version
 	$(PYTHON3BIN) -m mypy --config-file pyproject.toml $(py_code_locs)
 	# Note I'm not sure if the following are actually version-dependent, but because they parse the Python code, I'll leave them here.
 	$(PYTHON3BIN) -m flake8 --toml-config=pyproject.toml $(py_code_locs)
-	#TODO Later: The following is a workaround for https://github.com/pylint-dev/pylint/issues/10000 (on Python 3.13.0rc3), remove when fixed
-	ISPY13RC="$$( $(PYTHON3BIN) --version | perl -ne 'print "yes" if /Python 3\.13\.0rc/' )"
-	$(PYTHON3BIN) -m pylint --rcfile=pyproject.toml $${ISPY13RC:+"--disable=no-name-in-module"} --recursive=y $(py_code_locs)
+	$(PYTHON3BIN) -m pylint --rcfile=pyproject.toml --recursive=y $(py_code_locs)
 
 other-checks:  ## Checks not depending on the Python version
 	@set -euxo pipefail

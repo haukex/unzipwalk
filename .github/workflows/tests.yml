@@ -9,11 +9,6 @@ jobs:
       matrix:
         os: [Ubuntu, Windows, macOS]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-        #TODO Later: The workaround for pylint+3.13.0rc3 isn't working on macOS for some reason
-        # remove the following exception when that gets fixed (see pylint step in Makefile)
-        exclude:
-          - os: macOS
-            python-version: "3.13"
     runs-on: ${{ matrix.os }}-latest
     # Reminder: Keep in sync with dev/local-actions.sh
     steps:
