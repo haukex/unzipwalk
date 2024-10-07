@@ -36,7 +36,6 @@ installdeps:  ## Install project dependencies
 	@set -euxo pipefail
 	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location pip wheel
 	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location $(foreach x,$(requirement_txts),-r $(x))
-	$(PYTHON3BIN) -m pre_commit install -c dev/pre-commit.yml
 	# for modules/packages:
 	# $(PYTHON3BIN) -m pip install --editable .
 	# other examples: git lfs install / npm ci
@@ -84,7 +83,6 @@ ver-checks:  ## Checks that depend on the Python version
 
 other-checks:  ## Checks not depending on the Python version
 	@set -euxo pipefail
-	$(PYTHON3BIN) -m pre_commit run -c dev/pre-commit.yml --all-files
 	# note the following is on one line b/c GitHub macOS Action Runners are running bash 3.2 and the multiline version didn't work there...
 	for REQ in $(requirement_txts); do $(PYTHON3BIN) -m pur --skip-gt --dry-run-changed --nonzero-exit-code -r "$$REQ"; done
 

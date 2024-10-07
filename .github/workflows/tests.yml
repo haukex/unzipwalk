@@ -39,13 +39,6 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             dev/requirements.txt
-      - name: Cache pre-commit
-        # Only needed for version-independent checks below:
-        if: ${{ matrix.python-version == '3.12' }}
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit|${{ matrix.os }}|${{ hashFiles('dev/pre-commit.yml') }}
       - name: Install dependencies
         run: make installdeps
       - name: Run checks and lint
