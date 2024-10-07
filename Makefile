@@ -1,13 +1,14 @@
 ## To get help on this makefile, run `make help`.
 # https://www.gnu.org/software/make/manual/make.html
 
+# Adapt these variables for this project:
 py_code_locs = unzipwalk tests docs/*.py docs/_ext/*.py
 # Hint: $(filter-out whatever,$(py_code_locs))
 # Remember to keep in sync with GitHub Actions workflows:
 requirement_txts = requirements.txt dev/requirements.txt docs/requirements.txt
 perm_checks = ./* .gitignore .vscode .github
 
-# The user can change the following on the command line, but note that some tools below won't use this variable!
+# The user can change the following on the command line, but note that some tools below may not use this variable!
 PYTHON3BIN = python
 
 .PHONY: help tasklist installdeps test
@@ -38,12 +39,12 @@ installdeps:  ## Install project dependencies
 	$(PYTHON3BIN) -m pre_commit install -c dev/pre-commit.yml
 	# for modules/packages:
 	# $(PYTHON3BIN) -m pip install --editable .
+	# other examples: git lfs install / npm ci
 
 smoke-checks:  ## Basic smoke tests
 	@set -euxo pipefail
 	# example: [[ "$$OSTYPE" =~ linux.* ]]  # this project only runs on Linux
-	# make sure we're on Python 3
-	[[ "$$($(PYTHON3BIN) --version)" =~ ^Python\ 3\. ]]
+	[[ "$$($(PYTHON3BIN) --version)" =~ ^Python\ 3\. ]]  # make sure we're on Python 3
 
 nix-checks:  ## Checks that depend on a *NIX OS/FS
 	@set -euo pipefail
@@ -93,17 +94,14 @@ unittest:  ## Run unit tests
 coverage:  ## Run unit tests with coverage
 	@set -euxo pipefail
 	# Note: Don't add command-line arguments here, put them in the rcfile
+	# We also don't use --fail_under=100 because then the report won't be written.
 	PYTHONDEVMODE=1 PYTHONWARNINGS=error PYTHONWARNDEFAULTENCODING=1 $(PYTHON3BIN) -m coverage run --rcfile=pyproject.toml
 	$(PYTHON3BIN) -m coverage report --rcfile=pyproject.toml
 	# $(PYTHON3BIN) -m coverage html --rcfile=pyproject.toml
 	$(PYTHON3BIN) -m coverage xml --rcfile=pyproject.toml
-	set +x
-	# We don't use --fail_under=100 above because then the report won't be written.
-	# Also, the GitHub macOS runners didn't like doing the following check in bash (probably due to the old bash),
-	# so we'll just hand it off to Perl:
-	$(PYTHON3BIN) -m coverage json --rcfile=pyproject.toml -o- | jq .totals.percent_covered \
-		| perl -wMstrict -0777 -MTerm::ANSIColor=colored -ne \
-		's/\s+\z//; print "=> ",colored([$$_==100?"green":"red"],"$$_% Coverage")," <=\n"; exit($$_==100?0:1)'
+	$(PYTHON3BIN) -m coverage json --rcfile=pyproject.toml -o- \
+		| perl -wM5.014 -MJSON::PP=decode_json -MTerm::ANSIColor=colored -0777 -ne \
+		'$$_=decode_json($$_)->{totals}{percent_covered};print"=> ",colored([$$_==100?"green":"red"],"$$_% Coverage")," <=\n";exit($$_==100?0:1)'
 
 # https://stackoverflow.com/q/8889035
 help:   ## Show this help

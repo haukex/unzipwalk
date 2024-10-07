@@ -2,6 +2,9 @@
     "files.eol": "\n",
     "files.trimTrailingWhitespace": true,
     "editor.rulers": [ 150 ],  // keep in sync with pyproject.toml
+    "[markdown]": {
+        "editor.rulers": [ 100 ],
+    },
     "cSpell.language": "en,en-US",
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": true,

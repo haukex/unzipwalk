@@ -42,6 +42,7 @@ unzipwalk = "unzipwalk:main"
 "Bug Tracker" = "https://github.com/haukex/unzipwalk/issues"
 "Changelog" = "https://github.com/haukex/unzipwalk/blob/main/CHANGELOG.md"
 
+# ##### ##### ##### ##### ##### Hauke's Python Type Checker / Linter Settings ##### ##### ##### ##### #####
 
 # Individual lines can be ignored with:
 # pylance: ``# pyright: ignore [settingName]``

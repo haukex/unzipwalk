@@ -48,6 +48,7 @@ activate_venv () {
     fi
 }
 
+# Reminder: Keep version list in sync with `.github/workflows/tests.yml`.
 for PY_VER in 3.9 3.10 3.11 3.12 3.13; do
     echo -e "\e[1;33m====================================================> Python $PY_VER <====================================================\e[0m"
 

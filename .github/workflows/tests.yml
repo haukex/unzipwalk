@@ -2,19 +2,21 @@
 name: Full Python Tests, Lint, and Coverage (all versions and OSes)
 on:
   push:
+    # only on commits, not on tags
     branches:
       - '**'
   pull_request:
 jobs:
   tests:
     name: CPython ${{ matrix.python-version }} on ${{ matrix.os }}
+    # Reminder: Keep in sync with dev/local-actions.sh
     strategy:
       fail-fast: false
       matrix:
         os: [Ubuntu, Windows, macOS]
+        # Remember that some tests below only run on one version, so keep that up-to-date.
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}-latest
-    # Reminder: Keep in sync with dev/local-actions.sh
     steps:
       - name: Disable autocrlf on Windows
         if: ${{ matrix.os == 'Windows' }}
@@ -38,6 +40,7 @@ jobs:
             requirements.txt
             dev/requirements.txt
       - name: Cache pre-commit
+        # Only needed for version-independent checks below:
         if: ${{ matrix.python-version == '3.12' }}
         uses: actions/cache@v4
         with:
