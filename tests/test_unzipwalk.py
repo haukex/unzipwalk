@@ -33,11 +33,11 @@ import unittest
 from hashlib import sha1
 from copy import deepcopy
 from lzma import LZMAError
+from typing import Optional
 from gzip import BadGzipFile
 from tarfile import TarError
 from zipfile import BadZipFile
 from unittest.mock import patch
-from typing import Optional, cast
 from tempfile import TemporaryDirectory, TemporaryFile
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import PurePath, Path, PurePosixPath, PureWindowsPath
@@ -300,7 +300,7 @@ class UnzipWalkTestCase(unittest.TestCase):
             uut.UnzipWalkResult((Path(),), FileType.FILE, None).validate()
         with self.assertRaises(TypeError):
             with TemporaryFile() as tf:
-                uut.UnzipWalkResult((Path(),), FileType.OTHER, cast(uut.ReadOnlyBinary, tf)).validate()
+                uut.UnzipWalkResult((Path(),), FileType.OTHER, tf).validate()
 
     def test_checksum_lines(self):
         res = uut.UnzipWalkResult(names=(PurePosixPath('hello'),), typ=FileType.DIR)
@@ -328,7 +328,7 @@ class UnzipWalkTestCase(unittest.TestCase):
         self.assertEqual( res2.names, (PureWindowsPath('C:\\','Foo','Bar'),) )
 
         res = uut.UnzipWalkResult(names=(PurePosixPath('hello'),PurePosixPath('world')),
-            typ=FileType.FILE, hnd=cast(uut.ReadOnlyBinary, io.BytesIO(b'abcdef')))
+            typ=FileType.FILE, hnd=io.BytesIO(b'abcdef'))
         ln = res.checksum_line("md5")
         self.assertEqual( ln, "e80b5017098950fc58aad83c8c14978e *('hello', 'world')" )
         res2 = uut.UnzipWalkResult.from_checksum_line(ln)

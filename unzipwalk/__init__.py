@@ -143,7 +143,7 @@ from gzip import GzipFile, BadGzipFile
 from zipfile import ZipFile, BadZipFile, LargeZipFile
 from collections.abc import Generator, Sequence, Callable
 from pathlib import PurePosixPath, PurePath, Path, PureWindowsPath
-from typing import Optional, cast, Protocol, Literal, BinaryIO, NamedTuple, runtime_checkable, Union
+from typing import Optional, cast, Protocol, BinaryIO, IO, NamedTuple, runtime_checkable, Union
 from igbpyutils.file import AnyPaths, to_Paths, Filename, open_out
 import igbpyutils.error
 #TODO Later: Currently this whole file and its tests are excluded from py-check-script-vs-lib due to this `try`, what's a better way?
@@ -184,7 +184,7 @@ class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
         """
     @property
     def closed(self) -> bool: ...
-    def readable(self) -> Literal[True]:
+    def readable(self) -> bool:
         return True
     def read(self, n: int = -1, /) -> bytes: ...
     def readline(self, limit: int = -1, /) -> bytes: ...
@@ -308,9 +308,7 @@ class UnzipWalkResult(NamedTuple):
                     return cls( names=mk_names(m.group(2)), typ=FileType[m.group(1)] )
             return None
         if m := CHECKSUM_LINE_RE.match(line):
-            bio = io.BytesIO(bytes.fromhex(m.group(1)))
-            assert isinstance(bio, ReadOnlyBinary)  # type: ignore[unreachable]
-            return cls( names=mk_names(m.group(2)), typ=FileType.FILE, hnd=bio )  # type: ignore[unreachable]
+            return cls( names=mk_names(m.group(2)), typ=FileType.FILE, hnd=io.BytesIO(bytes.fromhex(m.group(1))) )
         raise ValueError(f"failed to decode checksum line {line!r}")
 
 if py7zr:  # cover-req-lt3.13
@@ -329,7 +327,7 @@ else:  # cover-req-ge3.13  # cover-only-win32
     pass
 
 @contextmanager
-def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[BinaryIO, None, None]:
+def _inner_recur_open(fh :IO[bytes], fns :tuple[PurePath, ...]) -> Generator[IO[bytes], None, None]:
     try:
         bl = fns[0].name.lower()
         assert fns, fns
@@ -343,36 +341,36 @@ def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[Bina
                     #TODO Later: is the following fns[0:2] correct?
                     raise FileNotFoundError(f"not a file? {fns[0:2]}")
                 with ef as fh2:
-                    with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                    with _inner_recur_open(fh2, fns[1:]) as inner:
                         yield inner
         elif bl.endswith('.zip'):
             with ZipFile(fh) as zf:
                 with zf.open(str(fns[1])) as fh2:
-                    with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                    with _inner_recur_open(fh2, fns[1:]) as inner:
                         yield inner
         elif bl.endswith('.7z'):
             if not py7zr:  # cover-req-ge3.13  # cover-only-win32
                 raise ImportError("The py7zr package must be installed to open 7z files.")
-            with py7zr.SevenZipFile(fh) as sz:  # cover-req-lt3.13
+            with py7zr.SevenZipFile(cast(BinaryIO, fh)) as sz:  # cover-req-lt3.13
                 with _inner_recur_open(_rd1_7z(sz, str(fns[1])), fns[1:]) as inner:
                     yield inner
         elif bl.endswith('.bz2'):
             if fns[1] != fns[0].with_suffix(''):
                 raise FileNotFoundError(f"invalid bz2 filename {fns[0]} => {fns[1]}")
             with BZ2File(fh, mode='rb') as fh2:
-                with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                with _inner_recur_open(fh2, fns[1:]) as inner:
                     yield inner
         elif bl.endswith('.xz'):
             if fns[1] != fns[0].with_suffix(''):
                 raise FileNotFoundError(f"invalid xz filename {fns[0]} => {fns[1]}")
             with LZMAFile(fh, mode='rb') as fh2:
-                with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                with _inner_recur_open(fh2, fns[1:]) as inner:
                     yield inner
         elif bl.endswith('.gz'):
             if fns[1] != fns[0].with_suffix(''):
                 raise FileNotFoundError(f"invalid gzip filename {fns[0]} => {fns[1]}")
             with GzipFile(fileobj=fh, mode='rb') as fh2:
-                with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                with _inner_recur_open(cast(IO[bytes], fh2), fns[1:]) as inner:
                     yield inner
         else:
             assert False, 'should be unreachable'  # pragma: no cover
@@ -412,11 +410,11 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
             if encoding is not None or errors is not None or newline is not None:
                 yield io.TextIOWrapper(inner, encoding=encoding, errors=errors, newline=newline)
             else:
-                yield cast(ReadOnlyBinary, inner)
+                yield inner
 
 FilterType = Callable[[Sequence[PurePath]], bool]
 
-def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=too-many-statements,too-many-branches
+def _proc_file(fns :tuple[PurePath, ...], fh :IO[bytes], *,  # pylint: disable=too-many-statements,too-many-branches
                matcher :Optional[FilterType], raise_errors :bool) -> Generator[UnzipWalkResult, None, None]:
     bl = fns[-1].name.lower()
     if bl.endswith('.tar.xz') or bl.endswith('.tar.bz2') or bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
@@ -438,9 +436,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
                             assert ef is not None, ti  # make type checker happy; we know this is true because we checked it's a file
                             with ef as fh2:
                                 assert fh2.readable(), ti  # expected by ReadOnlyBinary
-                                # NOTE type checker thinks fh2 is typing.IO[bytes], but it's actually a tarfile.ExFileObject,
-                                # which is an io.BufferedReader subclass - which should be safe to cast to BinaryIO, I think.
-                                yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
+                                yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
                         except TarError:  # pragma: no cover
                             # This can't be covered (yet) because I haven't yet found a way to trigger a TarError here.
                             # Also, https://github.com/python/cpython/issues/120740
@@ -475,9 +471,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
                         try:
                             with zf.open(zi) as fh2:  # always binary mode
                                 assert fh2.readable(), zi  # expected by ReadOnlyBinary
-                                # NOTE type checker thinks fh2 is typing.IO[bytes], but it's actually a zipfile.ZipExtFile,
-                                # which is an io.BufferedIOBase subclass - which should be safe to cast to BinaryIO, I think.
-                                yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
+                                yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
                         except (RuntimeError, ValueError, BadZipFile, LargeZipFile):
                             if raise_errors:
                                 raise
@@ -491,7 +485,8 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
     elif bl.endswith('.7z'):
         if py7zr:  # cover-req-lt3.13
             try:
-                with py7zr.SevenZipFile(fh) as sz:
+                # The cast from IO[bytes] to BinaryIO should be ok here I think:
+                with py7zr.SevenZipFile(cast(BinaryIO, fh)) as sz:
                     for f7 in sz.list():
                         new_names = (*fns, PurePosixPath(f7.filename))
                         if matcher is not None and not matcher(new_names):
@@ -523,9 +518,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
         try:
             with BZ2File(fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
                 assert fh2.readable(), new_names  # expected by ReadOnlyBinary
-                # NOTE casting BZ2File to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
-                # but testing seems to show it's ok...
-                yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
+                yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
         except (OSError, EOFError):
             if raise_errors:
                 raise
@@ -540,9 +533,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
         try:
             with LZMAFile(fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
                 assert fh2.readable(), new_names  # expected by ReadOnlyBinary
-                # NOTE casting LZMAFile to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
-                # but testing seems to show it's ok...
-                yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
+                yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
         except LZMAError:
             if raise_errors:
                 raise
@@ -557,9 +548,9 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
         try:
             with GzipFile(fileobj=fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
                 assert fh2.readable(), new_names  # expected by ReadOnlyBinary
-                # NOTE casting GzipFile to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
-                # but testing seems to show it's ok...
-                yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
+                # NOTE casting GzipFile to IO[bytes] isn't 100% safe because the former doesn't
+                # implement the full interface, but testing seems to show it's ok...
+                yield from _proc_file(new_names, cast(IO[bytes], fh2), matcher=matcher, raise_errors=raise_errors)
         except (zlib.error, BadGzipFile, EOFError):
             if raise_errors:
                 raise
@@ -568,8 +559,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
             yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
     else:
         assert fh.readable(), fh  # expected by ReadOnlyBinary
-        # The following cast is safe since ReadOnlyBinary is a subset of the interfaces.
-        yield UnzipWalkResult(names=fns, typ=FileType.FILE, hnd=cast(ReadOnlyBinary, fh))
+        yield UnzipWalkResult(names=fns, typ=FileType.FILE, hnd=fh)
 
 def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_errors :bool = True) -> Generator[UnzipWalkResult, None, None]:
     """This generator recursively walks into directories and compressed files and yields named tuples of type :class:`UnzipWalkResult`.
