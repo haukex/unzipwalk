@@ -1,6 +1,12 @@
 Changelog for unzipwalk
 =======================
 
+1.8.0 - *not yet released*
+--------------------------
+
+- **Removed** `ReadOnlyBinary.name`
+- ...
+
 1.7.0 - Thu, Oct 31 2024
 ------------------------
 

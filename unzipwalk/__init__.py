@@ -176,17 +176,6 @@ class FileType(enum.IntEnum):
 @runtime_checkable
 class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
     """Interface for the file handle (file object) used in :class:`UnzipWalkResult`."""
-    @property
-    def name(self) -> str:
-        """The name of the file.
-
-        .. deprecated:: 1.7.0
-            Deprecated because not all underlying classes implement this.
-            Filenames are provided by :class:`UnzipWalkResult`.
-
-        .. warning:: Will be removed in 1.8.0! (TODO)
-        """
-        ...  # pylint: disable=unnecessary-ellipsis
     def close(self) -> None:
         """Close the file.
 
@@ -320,10 +309,8 @@ class UnzipWalkResult(NamedTuple):
             return None
         if m := CHECKSUM_LINE_RE.match(line):
             bio = io.BytesIO(bytes.fromhex(m.group(1)))
-            names = mk_names(m.group(2))
-            bio.name = names[-1]  # give it a .name property to make it conform to ReadOnlyBinary
             assert isinstance(bio, ReadOnlyBinary)  # type: ignore[unreachable]
-            return cls( names=names, typ=FileType.FILE, hnd=bio )  # type: ignore[unreachable]
+            return cls( names=mk_names(m.group(2)), typ=FileType.FILE, hnd=bio )  # type: ignore[unreachable]
         raise ValueError(f"failed to decode checksum line {line!r}")
 
 if py7zr:  # cover-req-lt3.13
@@ -519,7 +506,6 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
                                     raise
                                 yield UnzipWalkResult(names=new_names, typ=FileType.ERROR)
                             else:
-                                bio.name = f7.filename  # give it a .name property to make it conform to ReadOnlyBinary
                                 yield from _proc_file(new_names, bio, matcher=matcher, raise_errors=raise_errors)
             except py7zr.exceptions.ArchiveError:
                 if raise_errors:
@@ -539,9 +525,6 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
                 assert fh2.readable(), new_names  # expected by ReadOnlyBinary
                 # NOTE casting BZ2File to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
                 # but testing seems to show it's ok...
-                #TODO Later: why do I need "no cover" in the following two instead of -ge-3.13 ?
-                if not hasattr(fh2, 'name'):  # pragma: no cover
-                    fh2.name = str(new_names[-1])  # type: ignore[misc]  # make object conform to ReadOnlyBinary
                 yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
         except (OSError, EOFError):
             if raise_errors:
@@ -559,8 +542,6 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
                 assert fh2.readable(), new_names  # expected by ReadOnlyBinary
                 # NOTE casting LZMAFile to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
                 # but testing seems to show it's ok...
-                if not hasattr(fh2, 'name'):  # pragma: no cover
-                    fh2.name = str(new_names[-1])  # type: ignore[misc]  # make object conform to ReadOnlyBinary
                 yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
         except LZMAError:
             if raise_errors:
