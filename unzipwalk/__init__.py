@@ -128,7 +128,6 @@ along with this program. If not, see https://www.gnu.org/licenses/
 """
 import re
 import io
-import sys
 import ast
 import stat
 import zlib
@@ -145,7 +144,7 @@ from zipfile import ZipFile, BadZipFile, LargeZipFile
 from collections.abc import Generator, Sequence, Callable
 from pathlib import PurePosixPath, PurePath, Path, PureWindowsPath
 from typing import Optional, cast, Protocol, Literal, BinaryIO, NamedTuple, runtime_checkable, Union
-from igbpyutils.file import AnyPaths, to_Paths, Filename
+from igbpyutils.file import AnyPaths, to_Paths, Filename, open_out
 import igbpyutils.error
 #TODO Later: Currently this whole file and its tests are excluded from py-check-script-vs-lib due to this `try`, what's a better way?
 try:  # cover-req-lt3.13
@@ -655,15 +654,6 @@ def _arg_parser():
     parser.add_argument('paths', metavar='PATH', help='paths to process (default is current directory)', nargs='*')
     return parser
 
-@contextmanager
-def _open(filename :Optional[Filename]):
-    """Apparently needs to be in its own context manager (instead of using nullcontext) so the type checkers are happy."""
-    if filename and filename != '-':
-        with open(filename, 'x', encoding='UTF-8') as fh:
-            yield fh
-    else:
-        yield sys.stdout
-
 def main(argv=None):
     igbpyutils.error.init_handlers()
     parser = _arg_parser()
@@ -671,7 +661,7 @@ def main(argv=None):
     def matcher(paths :Sequence[PurePath]) -> bool:
         return not any( fnmatch(paths[-1].name, pat) for pat in args.exclude )
     report = (FileType.FILE, FileType.ERROR)
-    with _open(args.outfile) as fh:
+    with open_out(args.outfile) as fh:
         for result in unzipwalk( args.paths if args.paths else Path(), matcher=matcher, raise_errors=args.raise_errors ):
             if args.checksum:
                 if result.typ in report or args.all_files:
