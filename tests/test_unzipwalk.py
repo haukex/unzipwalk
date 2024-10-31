@@ -122,7 +122,7 @@ EXPECT_7Z :tuple[ResultType, ...] = (
 
     ( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.DIR ),
     ( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.ARCHIVE ),
-    ( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz"), PurePath("uvw.txt")),
+    ( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz"), PurePosixPath("uvw.txt")),
         b"This\nis\na\n7z\ntest\n", FileType.FILE ),
 )
 
@@ -385,7 +385,7 @@ class UnzipWalkTestCase(unittest.TestCase):
                  ( (self.bad_zips/"double.7z", PurePosixPath("bar.txt")), None, FileType.ERROR ),
                  ( (self.bad_zips/"not_a.7z",), None, FileType.ERROR ),
                  ( (self.bad_zips/"bad.7z",), None, FileType.ARCHIVE ),
-                 ( (self.bad_zips/"bad.7z", PurePath("broken.txt")), None, FileType.ERROR ),  # bad checksum
+                 ( (self.bad_zips/"bad.7z", PurePosixPath("broken.txt")), None, FileType.ERROR ),  # bad checksum
             ] ) )
         with self.assertRaises(BadGzipFile):
             for r in uut.unzipwalk((self.bad_zips/'not_a.gz'), raise_errors=False):  # pragma: no branch
