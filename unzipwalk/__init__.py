@@ -143,12 +143,12 @@ from pathlib import PurePosixPath, PurePath, Path, PureWindowsPath
 from typing import Optional, cast, Protocol, Literal, BinaryIO, NamedTuple, runtime_checkable, Union
 from igbpyutils.file import AnyPaths, to_Paths, Filename
 import igbpyutils.error
-import py7zr.exceptions
-#TODO Later: Currently this whole file is excluded from py-check-script-vs-lib due to this `try`, what's a better way?
-try:
-    import py7zr
-except (ImportError, OSError):  # pragma: no cover  (b/c it's tricky to test and the effects in the code below are tested)
-    py7zr = None  # type: ignore[assignment]
+#TODO Later: Currently this whole file and its tests are excluded from py-check-script-vs-lib due to this `try`, what's a better way?
+try:  # cover-req-lt3.13
+    import py7zr  # pyright: ignore [reportMissingImports]
+    import py7zr.exceptions  # pyright: ignore [reportMissingImports]
+except (ImportError, OSError):  # cover-req-ge3.13  # cover-only-win32
+    py7zr = None  # type: ignore[assignment,unused-ignore]
 
 class FileType(enum.IntEnum):
     """Used in :class:`UnzipWalkResult` to indicate the type of the file.
@@ -314,7 +314,7 @@ class UnzipWalkResult(NamedTuple):
             return cls( names=names, typ=FileType.FILE, hnd=bio )  # type: ignore[unreachable]
         raise ValueError(f"failed to decode checksum line {line!r}")
 
-if py7zr:  # pragma: no branch
+if py7zr:  # cover-req-lt3.13
     def _rd1_7z(sz :py7zr.SevenZipFile, fn :str) -> io.BytesIO:  # pyright: ignore [reportInvalidTypeForm]
         """Read one file from a 7z archive as a BytesIO object."""
         d = sz.read(targets=[str(fn)])
@@ -326,6 +326,8 @@ if py7zr:  # pragma: no branch
         bio = bios[0]
         assert isinstance(bio, io.BytesIO)
         return bio
+else:  # cover-req-ge3.13  # cover-only-win32
+    pass
 
 @contextmanager
 def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[BinaryIO, None, None]:
@@ -350,9 +352,9 @@ def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[Bina
                     with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
                         yield inner
         elif bl.endswith('.7z'):
-            if not py7zr:
+            if not py7zr:  # cover-req-ge3.13  # cover-only-win32
                 raise ImportError("The py7zr package must be installed to open 7z files.")
-            with py7zr.SevenZipFile(fh) as sz:
+            with py7zr.SevenZipFile(fh) as sz:  # cover-req-lt3.13
                 with _inner_recur_open(_rd1_7z(sz, str(fns[1])), fns[1:]) as inner:
                     yield inner
         elif bl.endswith('.gz'):
@@ -476,7 +478,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
         else:
             yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
     elif bl.endswith('.7z'):
-        if py7zr:
+        if py7zr:  # cover-req-lt3.13
             try:
                 with py7zr.SevenZipFile(fh) as sz:
                     for f7 in sz.list():
@@ -501,7 +503,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
                 yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
             else:
                 yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
-        else:
+        else:  # cover-req-ge3.13  # cover-only-win32
             yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
     elif bl.endswith('.gz'):
         new_names = (*fns, fns[-1].with_suffix(''))

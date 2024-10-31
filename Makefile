@@ -74,7 +74,7 @@ nix-checks:  ## Checks that depend on a *NIX OS/FS
 	fi
 	# exclusions to the following can be done by adding a line `-path '*/exclude/me.py' -o \` after `find`
 	find $(py_code_locs) \
-		-path 'unzipwalk/__init__.py' -o \
+		-path 'unzipwalk/__init__.py' -o -path 'tests/test_unzipwalk.py' -o \
 		-type f -iname '*.py' -exec \
 		$(PYTHON3BIN) -m igbpyutils.dev.script_vs_lib $${unreliable_perms:+"--exec-git"} --notice '{}' +
 
