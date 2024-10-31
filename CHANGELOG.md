@@ -5,6 +5,7 @@ Changelog for unzipwalk
 --------------------------
 
 - **Removed** `ReadOnlyBinary.name`
+- More robust and uniform exception handling
 - ...
 
 1.7.0 - Thu, Oct 31 2024

@@ -415,13 +415,16 @@ class UnzipWalkTestCase(unittest.TestCase):
                  ( (self.bad_zips/"not_a.tar.gz",), None, FileType.ERROR ),
                  ( (self.bad_zips/"not_a.tgz",), None, FileType.ERROR ),
                  ( (self.bad_zips/"not_a.zip",), None, FileType.ERROR ),
-                 ( (self.bad_zips/"not_a.tgz.gz",), None, FileType.ERROR ),
-                 ( (self.bad_zips/"not_a.tgz.bz2",), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.tgz.gz",), None, FileType.ARCHIVE ),
+                 ( (self.bad_zips/"not_a.tgz.gz", self.bad_zips/"not_a.tgz"), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.tgz.bz2",), None, FileType.ARCHIVE ),
+                 ( (self.bad_zips/"not_a.tgz.bz2", self.bad_zips/"not_a.tgz"), None, FileType.ERROR ),
                  ( (self.bad_zips/"not_a.zip.gz",), None, FileType.ARCHIVE ),
                  ( (self.bad_zips/"not_a.zip.gz", self.bad_zips/"not_a.zip"), None, FileType.ERROR ),
                  ( (self.bad_zips/"not_a.zip.bz2",), None, FileType.ARCHIVE ),
                  ( (self.bad_zips/"not_a.zip.bz2", self.bad_zips/"not_a.zip"), None, FileType.ERROR ),
-                 ( (self.bad_zips/"not_a.zip.xz",), None, FileType.ERROR ),
+                 ( (self.bad_zips/"not_a.zip.xz",), None, FileType.ARCHIVE ),
+                 ( (self.bad_zips/"not_a.zip.xz", self.bad_zips/"not_a.zip"), None, FileType.ERROR ),
                  ( (self.bad_zips/"features.zip",), None, FileType.ARCHIVE ),
                  ( (self.bad_zips/"features.zip", PurePosixPath("spiral.pl")), None, FileType.ERROR ),  # unsupported compression method
                  ( (self.bad_zips/"features.zip", PurePosixPath("foo.txt")), b'Top Secret\n', FileType.FILE ),
@@ -443,15 +446,15 @@ class UnzipWalkTestCase(unittest.TestCase):
                  ( (self.bad_zips/"not_a.7z",), None, FileType.ARCHIVE ),
                 ]) ) )
         with self.assertRaises(BadGzipFile):
-            for r in uut.unzipwalk((self.bad_zips/'not_a.gz'), raise_errors=False):  # pragma: no branch
+            for r in uut.unzipwalk((self.bad_zips/'not_a.gz')):  # pragma: no branch
                 if r.hnd is not None:  # pragma: no branch
                     r.hnd.read()
         with self.assertRaises(OSError):
-            for r in uut.unzipwalk((self.bad_zips/'not_a.bz2'), raise_errors=False):  # pragma: no branch
+            for r in uut.unzipwalk((self.bad_zips/'not_a.bz2')):  # pragma: no branch
                 if r.hnd is not None:  # pragma: no branch
                     r.hnd.read()
         with self.assertRaises(LZMAError):
-            for r in uut.unzipwalk((self.bad_zips/'not_a.xz'), raise_errors=False):  # pragma: no branch
+            for r in uut.unzipwalk((self.bad_zips/'not_a.xz')):  # pragma: no branch
                 if r.hnd is not None:  # pragma: no branch
                     r.hnd.read()
         if py7zr:  # cover-req-lt3.13
@@ -522,11 +525,11 @@ class UnzipWalkTestCase(unittest.TestCase):
             "ERROR ('not_a.tar.gz',)",
             "ERROR ('not_a.tgz',)",
             "ERROR ('not_a.zip',)",
-            "ERROR ('not_a.tgz.gz',)",
-            "ERROR ('not_a.tgz.bz2',)",
+            "ERROR ('not_a.tgz.gz', 'not_a.tgz')",
+            "ERROR ('not_a.tgz.bz2', 'not_a.tgz')",
             "ERROR ('not_a.zip.gz', 'not_a.zip')",
             "ERROR ('not_a.zip.bz2', 'not_a.zip')",
-            "ERROR ('not_a.zip.xz',)",
+            "ERROR ('not_a.zip.xz', 'not_a.zip')",
             "ERROR ('features.zip', 'spiral.pl')",
             "ERROR ('features.zip', 'bar.txt')",
             "FILE ('features.zip', 'foo.txt') b'Top Secret\\n'",
@@ -549,11 +552,11 @@ class UnzipWalkTestCase(unittest.TestCase):
             "# ERROR not_a.tar.gz",
             "# ERROR not_a.tgz",
             "# ERROR not_a.zip",
-            "# ERROR not_a.tgz.gz",
-            "# ERROR not_a.tgz.bz2",
+            "# ERROR ('not_a.tgz.gz', 'not_a.tgz')",
+            "# ERROR ('not_a.tgz.bz2', 'not_a.tgz')",
             "# ERROR ('not_a.zip.gz', 'not_a.zip')",
             "# ERROR ('not_a.zip.bz2', 'not_a.zip')",
-            "# ERROR not_a.zip.xz",
+            "# ERROR ('not_a.zip.xz', 'not_a.zip')",
             "# ERROR ('features.zip', 'spiral.pl')",
             "# ERROR ('features.zip', 'bar.txt')",
             "f0294cd41b8a0a0c403911bb212d9edf *('features.zip', 'foo.txt')",

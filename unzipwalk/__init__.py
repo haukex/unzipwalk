@@ -130,17 +130,16 @@ import re
 import io
 import ast
 import stat
-import zlib
 import enum
 import hashlib
 import argparse
 from bz2 import BZ2File
+from gzip import GzipFile
+from lzma import LZMAFile
+from tarfile import TarFile
+from zipfile import ZipFile
 from fnmatch import fnmatch
-from lzma import LZMAFile, LZMAError
-from tarfile import TarFile, TarError
 from contextlib import contextmanager
-from gzip import GzipFile, BadGzipFile
-from zipfile import ZipFile, BadZipFile, LargeZipFile
 from collections.abc import Generator, Sequence, Callable
 from pathlib import PurePosixPath, PurePath, Path, PureWindowsPath
 from typing import Optional, cast, Protocol, BinaryIO, IO, NamedTuple, runtime_checkable, Union
@@ -273,7 +272,7 @@ class UnzipWalkResult(NamedTuple):
             h = hashlib.new(hash_algo)
             try:
                 h.update(self.hnd.read())
-            except (OSError, LZMAError, EOFError):  # BadGzipFile isa OSError, and bz2 throws OSErrors directly; EOFError isn't a OSError
+            except Exception:
                 if raise_errors:
                     raise
                 return f"# {FileType.ERROR.name} {name}"
@@ -435,9 +434,8 @@ def _proc_file(fns :tuple[PurePath, ...], fh :IO[bytes], *,  # pylint: disable=t
                             ef = tf.extractfile(ti)  # always binary
                             assert ef is not None, ti  # make type checker happy; we know this is true because we checked it's a file
                             with ef as fh2:
-                                assert fh2.readable(), ti  # expected by ReadOnlyBinary
                                 yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
-                        except TarError:  # pragma: no cover
+                        except Exception:  # pragma: no cover
                             # This can't be covered (yet) because I haven't yet found a way to trigger a TarError here.
                             # Also, https://github.com/python/cpython/issues/120740
                             if raise_errors:
@@ -445,7 +443,7 @@ def _proc_file(fns :tuple[PurePath, ...], fh :IO[bytes], *,  # pylint: disable=t
                             yield UnzipWalkResult(names=new_names, typ=FileType.ERROR)
                     else:
                         yield UnzipWalkResult(names=new_names, typ=FileType.OTHER)
-        except TarError:
+        except Exception:
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
@@ -470,13 +468,12 @@ def _proc_file(fns :tuple[PurePath, ...], fh :IO[bytes], *,  # pylint: disable=t
                     else:  # (note this interface doesn't have an is_file)
                         try:
                             with zf.open(zi) as fh2:  # always binary mode
-                                assert fh2.readable(), zi  # expected by ReadOnlyBinary
                                 yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
-                        except (RuntimeError, ValueError, BadZipFile, LargeZipFile):
+                        except Exception:
                             if raise_errors:
                                 raise
                             yield UnzipWalkResult(names=new_names, typ=FileType.ERROR)
-        except (RuntimeError, ValueError, BadZipFile, LargeZipFile):
+        except Exception:
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
@@ -496,13 +493,13 @@ def _proc_file(fns :tuple[PurePath, ...], fh :IO[bytes], *,  # pylint: disable=t
                         else:
                             try:
                                 bio = _rd1_7z(sz, f7.filename)
-                            except (OSError, py7zr.exceptions.ArchiveError):
+                            except Exception:
                                 if raise_errors:
                                     raise
                                 yield UnzipWalkResult(names=new_names, typ=FileType.ERROR)
                             else:
                                 yield from _proc_file(new_names, bio, matcher=matcher, raise_errors=raise_errors)
-            except py7zr.exceptions.ArchiveError:
+            except Exception:
                 if raise_errors:
                     raise
                 yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
@@ -514,48 +511,27 @@ def _proc_file(fns :tuple[PurePath, ...], fh :IO[bytes], *,  # pylint: disable=t
         new_names = (*fns, fns[-1].with_suffix(''))
         if matcher is not None and not matcher(new_names):
             yield UnzipWalkResult(names=fns, typ=FileType.SKIP)
-            return
-        try:
-            with BZ2File(fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
-                assert fh2.readable(), new_names  # expected by ReadOnlyBinary
-                yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
-        except (OSError, EOFError):
-            if raise_errors:
-                raise
-            yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
         else:
+            with BZ2File(fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
+                yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
             yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
     elif bl.endswith('.xz'):
         new_names = (*fns, fns[-1].with_suffix(''))
         if matcher is not None and not matcher(new_names):
             yield UnzipWalkResult(names=fns, typ=FileType.SKIP)
-            return
-        try:
-            with LZMAFile(fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
-                assert fh2.readable(), new_names  # expected by ReadOnlyBinary
-                yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
-        except LZMAError:
-            if raise_errors:
-                raise
-            yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
         else:
+            with LZMAFile(fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
+                yield from _proc_file(new_names, fh2, matcher=matcher, raise_errors=raise_errors)
             yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
     elif bl.endswith('.gz'):
         new_names = (*fns, fns[-1].with_suffix(''))
         if matcher is not None and not matcher(new_names):
             yield UnzipWalkResult(names=fns, typ=FileType.SKIP)
-            return
-        try:
+        else:
             with GzipFile(fileobj=fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
-                assert fh2.readable(), new_names  # expected by ReadOnlyBinary
                 # NOTE casting GzipFile to IO[bytes] isn't 100% safe because the former doesn't
                 # implement the full interface, but testing seems to show it's ok...
                 yield from _proc_file(new_names, cast(IO[bytes], fh2), matcher=matcher, raise_errors=raise_errors)
-        except (zlib.error, BadGzipFile, EOFError):
-            if raise_errors:
-                raise
-            yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
-        else:
             yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
     else:
         assert fh.readable(), fh  # expected by ReadOnlyBinary
@@ -592,14 +568,14 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
                     yield from ( r.validate() for r in _proc_file((p,), fh, matcher=matcher, raise_errors=raise_errors) )
             else:
                 yield UnzipWalkResult(names=(p,), typ=FileType.OTHER).validate()  # cover-not-win32
-        except (FileNotFoundError, PermissionError):  # cover-only-linux
+        except Exception:  # cover-only-linux  # (FileNotFoundError, PermissionError)
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=(p,), typ=FileType.ERROR).validate()
     for p in to_Paths(paths):
         try:
             is_dir = p.resolve(strict=True).is_dir()
-        except (FileNotFoundError, PermissionError):
+        except Exception:
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=(p,), typ=FileType.ERROR).validate()
@@ -643,7 +619,7 @@ def main(argv=None):
                     assert result.hnd is not None, result
                     try:
                         data = result.hnd.read()
-                    except (OSError, LZMAError, EOFError):  # BadGzipFile isa OSError, and bz2 throws OSErrors directly; EOFError isn't a OSError
+                    except Exception:
                         if args.raise_errors:
                             raise
                         print(f"{FileType.ERROR.name} {names!r}", file=fh)
