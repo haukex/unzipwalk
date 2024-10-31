@@ -6,19 +6,22 @@ set -euxo pipefail
 # and runs the test suite on it in an isolated venv.
 ###
 
-test -n "$1"
-DISTFILE="$(realpath "$1")"
-test -f "$DISTFILE"
+python3bin="${PYTHON3BIN:-python}"
 
-cd "$( dirname "${BASH_SOURCE[0]}" )"/..
+usage() { echo "Usage: $0 DIST_FILE" 1>&2; exit 1; }
+[[ $# -eq 1 ]] || usage
+dist_file="$(realpath "$1")"
+test -f "$dist_file" || usage
 
-TEMPDIR="$( mktemp --directory )"
-trap 'set +e; popd; rm -rf "$TEMPDIR"' EXIT
+cd -- "$( dirname -- "${BASH_SOURCE[0]}" )"/..
 
-rsync -a tests "$TEMPDIR" --exclude=__pycache__
+temp_dir="$( mktemp --directory )"
+trap 'set +e; popd; rm -rf "$temp_dir"' EXIT
 
-pushd "$TEMPDIR"
-python -m venv venv
-venv/bin/python -m pip -q install --upgrade pip
-venv/bin/python -m pip -q install "$DISTFILE"
-venv/bin/python -Im unittest -v
+rsync -a tests "$temp_dir" --exclude=__pycache__
+
+pushd "$temp_dir"
+$python3bin -m venv .venv
+.venv/bin/python -m pip -q install --upgrade pip
+.venv/bin/python -m pip install "$dist_file"
+.venv/bin/python -I -X dev -X warn_default_encoding -W error -m unittest -v

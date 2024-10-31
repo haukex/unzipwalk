@@ -1,15 +1,16 @@
 {
     "recommendations": [
         "ms-vscode.makefile-tools",
+        "github.vscode-github-actions",
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-python.mypy-type-checker",
         "ms-python.pylint",
         "ms-python.flake8",
-        "ryanluker.vscode-coverage-gutters",
+        "mads-hartmann.bash-ide-vscode",
         "timonwong.shellcheck",
+        "ryanluker.vscode-coverage-gutters",
         "oderwat.indent-rainbow",
-        "semanticdiff.semanticdiff",
         "tamasfe.even-better-toml",
         "streetsidesoftware.code-spell-checker",
     ]
