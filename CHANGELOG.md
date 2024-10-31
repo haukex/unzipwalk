@@ -4,7 +4,8 @@ Changelog for unzipwalk
 1.7.0 - Thu, Oct 31 2024
 ------------------------
 
-- Added support for `7z` files (requires module `py7zr` to be installed)
+- Added support for `.bz2`, `.xz`, and `.7z` files (the latter requires the module `py7zr` to be installed)
+- **Warning: Deprecated** `ReadOnlyBinary.name` property; will be removed in the next release.
 
 1.6.0 - Wed, Jun 19 2024
 ------------------------

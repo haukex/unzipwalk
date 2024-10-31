@@ -6,7 +6,7 @@ Recursively Walk Into Directories and Archives
 This module primarily provides the function :func:`unzipwalk`, which recursively walks
 into directories and compressed files and returns all files, directories, etc. found,
 together with binary file handles (file objects) for reading the files.
-Currently supported are ZIP, tar, tgz (.tar.gz), and gz compressed files,
+Currently supported are ZIP, tar, tgz (.tar.gz), bz2, xz, and gz compressed files,
 plus 7zip files if the Python package :mod:`py7zr` is installed.
 You can install this package with ``pip install unzipwalk[7z]`` to get the latter.
 File types are detected based on their extensions.
@@ -62,6 +62,8 @@ Please note that both :func:`unzipwalk` and :func:`recursive_open` can raise a v
 - ``py7zr.exceptions.ArchiveError`` and its subclasses like :exc:`py7zr.Bad7zFile`
 - :exc:`gzip.BadGzipFile` - *however*, see the notes in :func:`unzipwalk` about when these are actually raised
 - :exc:`zlib.error`
+- :exc:`lzma.LZMAError`
+- :exc:`EOFError`
 - various :exc:`OSError`\\s
 - other exceptions may be possible
 
@@ -70,7 +72,7 @@ Therefore, you may want to catch all :exc:`RuntimeError`\\s to play it safe.
 .. seealso::
     - `zipfile Issues <https://github.com/orgs/python/projects/7>`_
     - `tarfile Issues <https://github.com/orgs/python/projects/11>`_
-    - `gzip Issues <https://github.com/orgs/python/projects/20/views/2>`_
+    - `Compression issues <https://github.com/orgs/python/projects/20>`_ (gzip, bzip2, lzma)
     - `py7zr Issues <https://github.com/miurahr/py7zr/issues>`_
 
 .. note::
@@ -133,7 +135,9 @@ import zlib
 import enum
 import hashlib
 import argparse
+from bz2 import BZ2File
 from fnmatch import fnmatch
+from lzma import LZMAFile, LZMAError
 from tarfile import TarFile, TarError
 from contextlib import contextmanager
 from gzip import GzipFile, BadGzipFile
@@ -172,19 +176,28 @@ class FileType(enum.IntEnum):
 
 @runtime_checkable
 class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
-    """Interface for the file handle (file object) used in :class:`UnzipWalkResult`.
-
-    The interface is the intersection of :class:`typing.BinaryIO`, :class:`gzip.GzipFile`, and :mod:`zipfile.ZipExtFile<zipfile>`.
-    Because :class:`gzip.GzipFile` doesn't implement ``.tell()``, that method isn't available here.
-    Whether the handle supports seeking depends on the underlying library.
-
-    Note :func:`unzipwalk` automatically closes files."""
+    """Interface for the file handle (file object) used in :class:`UnzipWalkResult`."""
     @property
-    def name(self) -> str: ...
-    def close(self) -> None: ...
+    def name(self) -> str:
+        """The name of the file.
+
+        .. deprecated:: 1.7.0
+            Deprecated because not all underlying classes implement this.
+            Filenames are provided by :class:`UnzipWalkResult`.
+
+        .. warning:: Will be removed in 1.8.0! (TODO)
+        """
+        ...  # pylint: disable=unnecessary-ellipsis
+    def close(self) -> None:
+        """Close the file.
+
+        .. note::
+            :func:`unzipwalk` automatically closes files.
+        """
     @property
     def closed(self) -> bool: ...
-    def readable(self) -> Literal[True]: ...
+    def readable(self) -> Literal[True]:
+        return True
     def read(self, n: int = -1, /) -> bytes: ...
     def readline(self, limit: int = -1, /) -> bytes: ...
     def seekable(self) -> bool: ...
@@ -272,7 +285,7 @@ class UnzipWalkResult(NamedTuple):
             h = hashlib.new(hash_algo)
             try:
                 h.update(self.hnd.read())
-            except BadGzipFile:
+            except (OSError, LZMAError, EOFError):  # BadGzipFile isa OSError, and bz2 throws OSErrors directly; EOFError isn't a OSError
                 if raise_errors:
                     raise
                 return f"# {FileType.ERROR.name} {name}"
@@ -337,7 +350,7 @@ def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[Bina
         if len(fns)==1:
             yield fh
         # the following code is very similar to _proc_file, please see those code comments for details
-        elif bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
+        elif bl.endswith('.tar.xz') or bl.endswith('.tar.bz2') or bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
             with TarFile.open(fileobj=fh) as tf:
                 ef = tf.extractfile(str(fns[1]))
                 if not ef:  # e.g. directory
@@ -356,6 +369,18 @@ def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[Bina
                 raise ImportError("The py7zr package must be installed to open 7z files.")
             with py7zr.SevenZipFile(fh) as sz:  # cover-req-lt3.13
                 with _inner_recur_open(_rd1_7z(sz, str(fns[1])), fns[1:]) as inner:
+                    yield inner
+        elif bl.endswith('.bz2'):
+            if fns[1] != fns[0].with_suffix(''):
+                raise FileNotFoundError(f"invalid bz2 filename {fns[0]} => {fns[1]}")
+            with BZ2File(fh, mode='rb') as fh2:
+                with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
+                    yield inner
+        elif bl.endswith('.xz'):
+            if fns[1] != fns[0].with_suffix(''):
+                raise FileNotFoundError(f"invalid xz filename {fns[0]} => {fns[1]}")
+            with LZMAFile(fh, mode='rb') as fh2:
+                with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
                     yield inner
         elif bl.endswith('.gz'):
             if fns[1] != fns[0].with_suffix(''):
@@ -408,7 +433,7 @@ FilterType = Callable[[Sequence[PurePath]], bool]
 def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=too-many-statements,too-many-branches
                matcher :Optional[FilterType], raise_errors :bool) -> Generator[UnzipWalkResult, None, None]:
     bl = fns[-1].name.lower()
-    if bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
+    if bl.endswith('.tar.xz') or bl.endswith('.tar.bz2') or bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
         try:
             with TarFile.open(fileobj=fh, errorlevel=2) as tf:
                 for ti in tf.getmembers():
@@ -504,6 +529,45 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=to
             else:
                 yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
         else:  # cover-req-ge3.13  # cover-only-win32
+            yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
+    elif bl.endswith('.bz2'):
+        new_names = (*fns, fns[-1].with_suffix(''))
+        if matcher is not None and not matcher(new_names):
+            yield UnzipWalkResult(names=fns, typ=FileType.SKIP)
+            return
+        try:
+            with BZ2File(fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
+                assert fh2.readable(), new_names  # expected by ReadOnlyBinary
+                # NOTE casting BZ2File to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
+                # but testing seems to show it's ok...
+                #TODO Later: why do I need "no cover" in the following two instead of -ge-3.13 ?
+                if not hasattr(fh2, 'name'):  # pragma: no cover
+                    fh2.name = str(new_names[-1])  # type: ignore[misc]  # make object conform to ReadOnlyBinary
+                yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
+        except (OSError, EOFError):
+            if raise_errors:
+                raise
+            yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
+        else:
+            yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
+    elif bl.endswith('.xz'):
+        new_names = (*fns, fns[-1].with_suffix(''))
+        if matcher is not None and not matcher(new_names):
+            yield UnzipWalkResult(names=fns, typ=FileType.SKIP)
+            return
+        try:
+            with LZMAFile(fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
+                assert fh2.readable(), new_names  # expected by ReadOnlyBinary
+                # NOTE casting LZMAFile to BinaryIO isn't 100% safe because the former doesn't implement the full interface,
+                # but testing seems to show it's ok...
+                if not hasattr(fh2, 'name'):  # pragma: no cover
+                    fh2.name = str(new_names[-1])  # type: ignore[misc]  # make object conform to ReadOnlyBinary
+                yield from _proc_file(new_names, cast(BinaryIO, fh2), matcher=matcher, raise_errors=raise_errors)
+        except LZMAError:
+            if raise_errors:
+                raise
+            yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
+        else:
             yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
     elif bl.endswith('.gz'):
         new_names = (*fns, fns[-1].with_suffix(''))
@@ -618,7 +682,7 @@ def main(argv=None):
                     assert result.hnd is not None, result
                     try:
                         data = result.hnd.read()
-                    except BadGzipFile:
+                    except (OSError, LZMAError, EOFError):  # BadGzipFile isa OSError, and bz2 throws OSErrors directly; EOFError isn't a OSError
                         if args.raise_errors:
                             raise
                         print(f"{FileType.ERROR.name} {names!r}", file=fh)

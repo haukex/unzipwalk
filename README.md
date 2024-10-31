@@ -5,7 +5,7 @@
 This module primarily provides the function [`unzipwalk()`](#function-unzipwalk), which recursively walks
 into directories and compressed files and returns all files, directories, etc. found,
 together with binary file handles (file objects) for reading the files.
-Currently supported are ZIP, tar, tgz (.tar.gz), and gz compressed files,
+Currently supported are ZIP, tar, tgz (.tar.gz), bz2, xz, and gz compressed files,
 plus 7zip files if the Python package [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is installed.
 You can install this package with `pip install unzipwalk[7z]` to get the latter.
 File types are detected based on their extensions.
@@ -65,6 +65,8 @@ Please note that both [`unzipwalk()`](#function-unzipwalk) and [`recursive_open(
 - `py7zr.exceptions.ArchiveError` and its subclasses like [`py7zr.Bad7zFile`](https://py7zr.readthedocs.io/en/stable/api.html#py7zr.Bad7zFile)
 - [`gzip.BadGzipFile`](https://docs.python.org/3/library/gzip.html#gzip.BadGzipFile) - *however*, see the notes in [`unzipwalk()`](#function-unzipwalk) about when these are actually raised
 - [`zlib.error`](https://docs.python.org/3/library/zlib.html#zlib.error)
+- [`lzma.LZMAError`](https://docs.python.org/3/library/lzma.html#lzma.LZMAError)
+- [`EOFError`](https://docs.python.org/3/library/exceptions.html#EOFError)
 - various [`OSError`](https://docs.python.org/3/library/exceptions.html#OSError)s
 - other exceptions may be possible
 
@@ -73,7 +75,7 @@ Therefore, you may want to catch all [`RuntimeError`](https://docs.python.org/3/
 #### SEE ALSO
 - [zipfile Issues](https://github.com/orgs/python/projects/7)
 - [tarfile Issues](https://github.com/orgs/python/projects/11)
-- [gzip Issues](https://github.com/orgs/python/projects/20/views/2)
+- [Compression issues](https://github.com/orgs/python/projects/20) (gzip, bzip2, lzma)
 - [py7zr Issues](https://github.com/miurahr/py7zr/issues)
 
 #### NOTE
@@ -251,15 +253,23 @@ Hi, I'm a compressed file!
 
 Interface for the file handle (file object) used in [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
 
-The interface is the intersection of [`typing.BinaryIO`](https://docs.python.org/3/library/typing.html#typing.BinaryIO), [`gzip.GzipFile`](https://docs.python.org/3/library/gzip.html#gzip.GzipFile), and [`zipfile.ZipExtFile`](https://docs.python.org/3/library/zipfile.html#module-zipfile).
-Because [`gzip.GzipFile`](https://docs.python.org/3/library/gzip.html#gzip.GzipFile) doesn’t implement `.tell()`, that method isn’t available here.
-Whether the handle supports seeking depends on the underlying library.
-
-Note [`unzipwalk()`](#function-unzipwalk) automatically closes files.
-
 #### *property* name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
+The name of the file.
+
+#### Deprecated
+Deprecated since version 1.7.0: Deprecated because not all underlying classes implement this.
+Filenames are provided by [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
+
+#### WARNING
+Will be removed in 1.8.0! (TODO)
+
 #### close() → [None](https://docs.python.org/3/library/constants.html#None)
+
+Close the file.
+
+#### NOTE
+[`unzipwalk()`](#function-unzipwalk) automatically closes files.
 
 #### *property* closed *: [bool](https://docs.python.org/3/library/functions.html#bool)*
 
