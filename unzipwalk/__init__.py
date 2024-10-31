@@ -67,7 +67,7 @@ Please note that both :func:`unzipwalk` and :func:`recursive_open` can raise a v
 - various :exc:`OSError`\\s
 - other exceptions may be possible
 
-Therefore, you may want to catch all :exc:`RuntimeError`\\s to play it safe.
+Therefore, you may need to catch all :exc:`Exception`\\s to play it safe.
 
 .. seealso::
     - `zipfile Issues <https://github.com/orgs/python/projects/7>`_

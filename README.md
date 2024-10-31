@@ -70,7 +70,7 @@ Please note that both [`unzipwalk()`](#function-unzipwalk) and [`recursive_open(
 - various [`OSError`](https://docs.python.org/3/library/exceptions.html#OSError)s
 - other exceptions may be possible
 
-Therefore, you may want to catch all [`RuntimeError`](https://docs.python.org/3/library/exceptions.html#RuntimeError)s to play it safe.
+Therefore, you may need to catch all [`Exception`](https://docs.python.org/3/library/exceptions.html#Exception)s to play it safe.
 
 #### SEE ALSO
 - [zipfile Issues](https://github.com/orgs/python/projects/7)
