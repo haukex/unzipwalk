@@ -1,6 +1,11 @@
 Changelog for unzipwalk
 =======================
 
+1.7.0 - Thu, Oct 31 2024
+------------------------
+
+- Added support for `7z` files (requires module `py7zr` to be installed)
+
 1.6.0 - Wed, Jun 19 2024
 ------------------------
 

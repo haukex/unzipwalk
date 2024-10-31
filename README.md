@@ -5,7 +5,9 @@
 This module primarily provides the function [`unzipwalk()`](#function-unzipwalk), which recursively walks
 into directories and compressed files and returns all files, directories, etc. found,
 together with binary file handles (file objects) for reading the files.
-Currently supported are ZIP, tar, tgz, and gz compressed files.
+Currently supported are ZIP, tar, tgz (.tar.gz), and gz compressed files,
+plus 7zip files if the Python package [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is installed.
+You can install this package with `pip install unzipwalk[7z]` to get the latter.
 File types are detected based on their extensions.
 
 ```pycon
@@ -56,10 +58,23 @@ For example, to read all CSV files in the current directory and below, including
 ['42', 'Hello', 'World']
 ```
 
+Please note that both [`unzipwalk()`](#function-unzipwalk) and [`recursive_open()`](#unzipwalk.recursive_open) can raise a variety of errors:
+
+- [`zipfile.BadZipFile`](https://docs.python.org/3/library/zipfile.html#zipfile.BadZipFile)
+- [`tarfile.TarError`](https://docs.python.org/3/library/tarfile.html#tarfile.TarError)
+- `py7zr.exceptions.ArchiveError` and its subclasses like [`py7zr.Bad7zFile`](https://py7zr.readthedocs.io/en/stable/api.html#py7zr.Bad7zFile)
+- [`gzip.BadGzipFile`](https://docs.python.org/3/library/gzip.html#gzip.BadGzipFile) - *however*, see the notes in [`unzipwalk()`](#function-unzipwalk) about when these are actually raised
+- [`zlib.error`](https://docs.python.org/3/library/zlib.html#zlib.error)
+- various [`OSError`](https://docs.python.org/3/library/exceptions.html#OSError)s
+- other exceptions may be possible
+
+Therefore, you may want to catch all [`RuntimeError`](https://docs.python.org/3/library/exceptions.html#RuntimeError)s to play it safe.
+
 #### SEE ALSO
 - [zipfile Issues](https://github.com/orgs/python/projects/7)
 - [tarfile Issues](https://github.com/orgs/python/projects/11)
 - [gzip Issues](https://github.com/orgs/python/projects/20/views/2)
+- [py7zr Issues](https://github.com/miurahr/py7zr/issues)
 
 #### NOTE
 The original name of a gzip-compressed file is derived from the compressed file’s name
@@ -85,6 +100,8 @@ This generator recursively walks into directories and compressed files and yield
     a [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.ERROR`](#unzipwalk.FileType) is yielded for those files instead.
     **However,** be aware that [`gzip.BadGzipFile`](https://docs.python.org/3/library/gzip.html#gzip.BadGzipFile) errors are not raised until the file is actually read,
     so you’d need to add an exception handler around your read() call to handle such cases.
+
+If [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is not installed, those archives will not be descended into.
 
 #### NOTE
 Do not rely on the order of results! But see also the discussion in the main documentation about why
@@ -225,6 +242,9 @@ in turn is stored in a Zip file:
 Hi, I'm a compressed file!
 ```
 
+* **Raises:**
+  [**ImportError**](https://docs.python.org/3/library/exceptions.html#ImportError) – If you try to open a 7z file but [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is not installed.
+
 <a id="unzipwalk.ReadOnlyBinary"></a>
 
 ### *class* unzipwalk.ReadOnlyBinary(\*args, \*\*kwargs)
@@ -245,13 +265,13 @@ Note [`unzipwalk()`](#function-unzipwalk) automatically closes files.
 
 #### readable() → [Literal](https://docs.python.org/3/library/typing.html#typing.Literal)[True]
 
-#### read(n: [int](https://docs.python.org/3/library/functions.html#int) = -1) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
+#### read(n: [int](https://docs.python.org/3/library/functions.html#int) = -1, /) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
 
-#### readline(limit: [int](https://docs.python.org/3/library/functions.html#int) = -1) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
+#### readline(limit: [int](https://docs.python.org/3/library/functions.html#int) = -1, /) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
 
 #### seekable() → [bool](https://docs.python.org/3/library/functions.html#bool)
 
-#### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0) → [int](https://docs.python.org/3/library/functions.html#int)
+#### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0, /) → [int](https://docs.python.org/3/library/functions.html#int)
 
 ## Command-Line Interface
 
@@ -279,9 +299,9 @@ optional arguments:
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future
 versions. For more control, use the library instead of this command-line tool.
-** Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, ripemd160,
-sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
-sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
+** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, ripemd160, sha1,
+sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
+sha512_224, sha512_256, shake_128, shake_256, sm3
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.

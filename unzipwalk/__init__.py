@@ -6,7 +6,9 @@ Recursively Walk Into Directories and Archives
 This module primarily provides the function :func:`unzipwalk`, which recursively walks
 into directories and compressed files and returns all files, directories, etc. found,
 together with binary file handles (file objects) for reading the files.
-Currently supported are ZIP, tar, tgz, and gz compressed files.
+Currently supported are ZIP, tar, tgz (.tar.gz), and gz compressed files,
+plus 7zip files if the Python package :mod:`py7zr` is installed.
+You can install this package with ``pip install unzipwalk[7z]`` to get the latter.
 File types are detected based on their extensions.
 
     >>> from unzipwalk import unzipwalk
@@ -53,10 +55,23 @@ For example, to read all CSV files in the current directory and below, including
     ['Id', 'Name', 'Address']
     ['42', 'Hello', 'World']
 
+Please note that both :func:`unzipwalk` and :func:`recursive_open` can raise a variety of errors:
+
+- :exc:`zipfile.BadZipFile`
+- :exc:`tarfile.TarError`
+- ``py7zr.exceptions.ArchiveError`` and its subclasses like :exc:`py7zr.Bad7zFile`
+- :exc:`gzip.BadGzipFile` - *however*, see the notes in :func:`unzipwalk` about when these are actually raised
+- :exc:`zlib.error`
+- various :exc:`OSError`\\s
+- other exceptions may be possible
+
+Therefore, you may want to catch all :exc:`RuntimeError`\\s to play it safe.
+
 .. seealso::
     - `zipfile Issues <https://github.com/orgs/python/projects/7>`_
     - `tarfile Issues <https://github.com/orgs/python/projects/11>`_
     - `gzip Issues <https://github.com/orgs/python/projects/20/views/2>`_
+    - `py7zr Issues <https://github.com/miurahr/py7zr/issues>`_
 
 .. note::
     The original name of a gzip-compressed file is derived from the compressed file's name
@@ -128,6 +143,12 @@ from pathlib import PurePosixPath, PurePath, Path, PureWindowsPath
 from typing import Optional, cast, Protocol, Literal, BinaryIO, NamedTuple, runtime_checkable, Union
 from igbpyutils.file import AnyPaths, to_Paths, Filename
 import igbpyutils.error
+import py7zr.exceptions
+#TODO Later: Currently this whole file is excluded from py-check-script-vs-lib due to this `try`, what's a better way?
+try:
+    import py7zr
+except (ImportError, OSError):  # pragma: no cover  (b/c it's tricky to test and the effects in the code below are tested)
+    py7zr = None  # type: ignore[assignment]
 
 class FileType(enum.IntEnum):
     """Used in :class:`UnzipWalkResult` to indicate the type of the file.
@@ -164,10 +185,10 @@ class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
     @property
     def closed(self) -> bool: ...
     def readable(self) -> Literal[True]: ...
-    def read(self, n: int = -1) -> bytes: ...
-    def readline(self, limit: int = -1) -> bytes: ...
+    def read(self, n: int = -1, /) -> bytes: ...
+    def readline(self, limit: int = -1, /) -> bytes: ...
     def seekable(self) -> bool: ...
-    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int: ...
+    def seek(self, offset: int, whence: int = io.SEEK_SET, /) -> int: ...
 
 def decode_tuple(code :str) -> tuple[str, ...]:
     """Helper function to parse a string as produced by :func:`repr` from a :class:`tuple` of one or more :class:`str`.
@@ -286,8 +307,25 @@ class UnzipWalkResult(NamedTuple):
                     return cls( names=mk_names(m.group(2)), typ=FileType[m.group(1)] )
             return None
         if m := CHECKSUM_LINE_RE.match(line):
-            return cls( names=mk_names(m.group(2)), typ=FileType.FILE, hnd=cast(ReadOnlyBinary, io.BytesIO(bytes.fromhex(m.group(1)))) )
+            bio = io.BytesIO(bytes.fromhex(m.group(1)))
+            names = mk_names(m.group(2))
+            bio.name = names[-1]  # give it a .name property to make it conform to ReadOnlyBinary
+            assert isinstance(bio, ReadOnlyBinary)  # type: ignore[unreachable]
+            return cls( names=names, typ=FileType.FILE, hnd=bio )  # type: ignore[unreachable]
         raise ValueError(f"failed to decode checksum line {line!r}")
+
+if py7zr:  # pragma: no branch
+    def _rd1_7z(sz :py7zr.SevenZipFile, fn :str) -> io.BytesIO:  # pyright: ignore [reportInvalidTypeForm]
+        """Read one file from a 7z archive as a BytesIO object."""
+        d = sz.read(targets=[str(fn)])
+        if not d:  # none or empty
+            raise FileNotFoundError(f"failed to extract {fn}")
+        bios = list(d.values())
+        if len(bios)>1:
+            raise FileExistsError(f"Unexpected: More than one file found for name {fn}")
+        bio = bios[0]
+        assert isinstance(bio, io.BytesIO)
+        return bio
 
 @contextmanager
 def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[BinaryIO, None, None]:
@@ -301,6 +339,7 @@ def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[Bina
             with TarFile.open(fileobj=fh) as tf:
                 ef = tf.extractfile(str(fns[1]))
                 if not ef:  # e.g. directory
+                    #TODO Later: is the following fns[0:2] correct?
                     raise FileNotFoundError(f"not a file? {fns[0:2]}")
                 with ef as fh2:
                     with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
@@ -310,6 +349,12 @@ def _inner_recur_open(fh :BinaryIO, fns :tuple[PurePath, ...]) -> Generator[Bina
                 with zf.open(str(fns[1])) as fh2:
                     with _inner_recur_open(cast(BinaryIO, fh2), fns[1:]) as inner:
                         yield inner
+        elif bl.endswith('.7z'):
+            if not py7zr:
+                raise ImportError("The py7zr package must be installed to open 7z files.")
+            with py7zr.SevenZipFile(fh) as sz:
+                with _inner_recur_open(_rd1_7z(sz, str(fns[1])), fns[1:]) as inner:
+                    yield inner
         elif bl.endswith('.gz'):
             if fns[1] != fns[0].with_suffix(''):
                 raise FileNotFoundError(f"invalid gzip filename {fns[0]} => {fns[1]}")
@@ -342,6 +387,8 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
     >>> with recursive_open(('bar.zip', 'test.tar.gz', 'test/cool.txt.gz', 'test/cool.txt'), encoding='UTF-8') as fh:
     ...     print(fh.read())# doctest: +NORMALIZE_WHITESPACE
     Hi, I'm a compressed file!
+
+    :raises ImportError: If you try to open a 7z file but :mod:`py7zr` is not installed.
     """
     # note Sphinx's "WARNING: py:class reference target not found: _io.TextIOWrapper" can be ignored
     if not fns:
@@ -356,8 +403,8 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
 
 FilterType = Callable[[Sequence[PurePath]], bool]
 
-def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *, matcher :Optional[FilterType], raise_errors :bool  # pylint: disable=too-many-statements
-               ) -> Generator[UnzipWalkResult, None, None]:
+def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *,  # pylint: disable=too-many-statements,too-many-branches
+               matcher :Optional[FilterType], raise_errors :bool) -> Generator[UnzipWalkResult, None, None]:
     bl = fns[-1].name.lower()
     if bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
         try:
@@ -428,6 +475,34 @@ def _proc_file(fns :tuple[PurePath, ...], fh :BinaryIO, *, matcher :Optional[Fil
             yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
         else:
             yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
+    elif bl.endswith('.7z'):
+        if py7zr:
+            try:
+                with py7zr.SevenZipFile(fh) as sz:
+                    for f7 in sz.list():
+                        new_names = (*fns, PurePosixPath(f7.filename))
+                        if matcher is not None and not matcher(new_names):
+                            yield UnzipWalkResult(names=new_names, typ=FileType.SKIP)
+                        elif f7.is_directory:
+                            yield UnzipWalkResult(names=new_names, typ=FileType.DIR)
+                        else:
+                            try:
+                                bio = _rd1_7z(sz, f7.filename)
+                            except (OSError, py7zr.exceptions.ArchiveError):
+                                if raise_errors:
+                                    raise
+                                yield UnzipWalkResult(names=new_names, typ=FileType.ERROR)
+                            else:
+                                bio.name = f7.filename  # give it a .name property to make it conform to ReadOnlyBinary
+                                yield from _proc_file(new_names, bio, matcher=matcher, raise_errors=raise_errors)
+            except py7zr.exceptions.ArchiveError:
+                if raise_errors:
+                    raise
+                yield UnzipWalkResult(names=fns, typ=FileType.ERROR)
+            else:
+                yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
+        else:
+            yield UnzipWalkResult(names=fns, typ=FileType.ARCHIVE)
     elif bl.endswith('.gz'):
         new_names = (*fns, fns[-1].with_suffix(''))
         if matcher is not None and not matcher(new_names):
@@ -463,6 +538,8 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
         **However,** be aware that :exc:`gzip.BadGzipFile` errors are not raised until the file is actually read,
         so you'd need to add an exception handler around your `read()` call to handle such cases.
 
+    If :mod:`py7zr` is not installed, those archives will not be descended into.
+
     .. note:: Do not rely on the order of results! But see also the discussion in the main documentation about why
         e.g. ``sorted(unzipwalk(...))`` automatically closes files and so may not be what you want.
     """
@@ -471,15 +548,15 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
             if matcher is not None and not matcher((p,)):
                 yield UnzipWalkResult(names=(p,), typ=FileType.SKIP).validate()
             elif p.is_symlink():
-                yield UnzipWalkResult(names=(p,), typ=FileType.SYMLINK).validate()  # pragma: no cover  (doesn't run on Windows)
+                yield UnzipWalkResult(names=(p,), typ=FileType.SYMLINK).validate()  # cover-not-win32
             elif p.is_dir():
                 yield UnzipWalkResult(names=(p,), typ=FileType.DIR).validate()
             elif p.is_file():
                 with p.open('rb') as fh:
                     yield from ( r.validate() for r in _proc_file((p,), fh, matcher=matcher, raise_errors=raise_errors) )
             else:
-                yield UnzipWalkResult(names=(p,), typ=FileType.OTHER).validate()  # pragma: no cover  (doesn't run on Windows)
-        except (FileNotFoundError, PermissionError):  # pragma: no cover  (only tested on Linux)
+                yield UnzipWalkResult(names=(p,), typ=FileType.OTHER).validate()  # cover-not-win32
+        except (FileNotFoundError, PermissionError):  # cover-only-linux
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=(p,), typ=FileType.ERROR).validate()

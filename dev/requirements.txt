@@ -10,3 +10,5 @@ Flake8-pyproject == 1.2.3
 pur == 7.3.2
 build == 1.2.2.post1 ; sys_platform == 'linux'
 twine == 5.1.1 ; sys_platform == 'linux'
+# for this project:
+py7zr == 0.22.0

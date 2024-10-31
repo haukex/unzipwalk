@@ -19,4 +19,7 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx', 'sphinx_markdown_b
 
 autodoc_member_order = 'bysource'
 
-intersphinx_mapping = { 'python': ('https://docs.python.org/3', None) }
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'py7zr': ('https://py7zr.readthedocs.io/en/stable/', None),
+}

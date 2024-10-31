@@ -27,8 +27,21 @@
         "markdown"
     ],
     "cSpell.ignoreWords": [
+        "classmethod",
+        "hashlib",
         "igbpyutils",
-        "unzipwalk"
+        "kwargs",
+        "outfile",
+        "pathlib",
+        "posix",
+        "pycon",
+        "readline",
+        "repr",
+        "ripemd",
+        "seekable",
+        "tarfile",
+        "unzipwalk",
+        "zipfile"
     ],
 }
 /* vim: set filetype=javascript ts=4 sw=4 expandtab : */

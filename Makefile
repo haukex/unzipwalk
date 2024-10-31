@@ -72,9 +72,11 @@ nix-checks:  ## Checks that depend on a *NIX OS/FS
 			test -z "$$( find . \( -type d -name '.venv*' -prune \) -o \( -iname '*.sh' ! -executable -print \) )"
 		fi
 	fi
-	$(PYTHON3BIN) -m igbpyutils.dev.script_vs_lib $${unreliable_perms:+"--exec-git"} --notice $(py_code_locs)
-	# exclusions to the above can be done via:
-	# find $(py_code_locs) -path '*/exclude/me.py' -o -type f -iname '*.py' -exec py-check-script-vs-lib --notice '{}' +
+	# exclusions to the following can be done by adding a line `-path '*/exclude/me.py' -o \` after `find`
+	find $(py_code_locs) \
+		-path 'unzipwalk/__init__.py' -o \
+		-type f -iname '*.py' -exec \
+		$(PYTHON3BIN) -m igbpyutils.dev.script_vs_lib $${unreliable_perms:+"--exec-git"} --notice '{}' +
 
 shellcheck:  ## Run shellcheck
 	@set -euxo pipefail

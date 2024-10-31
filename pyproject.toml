@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "unzipwalk"
 description = "Recursively walk into directories and archives"
-version = "1.6.0"
+version = "1.7.0"
 authors = [ { name="Hauke D", email="haukex@zero-g.net" } ]
 readme = "README.md"
 requires-python = ">=3.9"
@@ -33,6 +33,9 @@ packages = ["unzipwalk"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
+
+[project.optional-dependencies]
+"7z" = ["py7zr>=0.22.0"]
 
 [project.scripts]
 unzipwalk = "unzipwalk:main"

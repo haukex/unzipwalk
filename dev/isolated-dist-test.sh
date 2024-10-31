@@ -23,5 +23,5 @@ rsync -a tests "$temp_dir" --exclude=__pycache__
 pushd "$temp_dir"
 $python3bin -m venv .venv
 .venv/bin/python -m pip -q install --upgrade pip
-.venv/bin/python -m pip install "$dist_file"
+.venv/bin/python -m pip install "$dist_file""[7z]"
 .venv/bin/python -I -X dev -X warn_default_encoding -W error -m unittest -v
