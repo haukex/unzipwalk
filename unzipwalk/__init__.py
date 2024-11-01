@@ -36,7 +36,9 @@ something as seemingly simple as ``sorted(unzipwalk('.'))`` would cause the code
 because all files will have been opened and closed during the call to :func:`sorted`
 and the handles to read the data would no longer be available in the body of the loop.
 This is why the above example first processes all the files before sorting the results.
-You can also use :func:`recursive_open` to open the files later.
+You can also use :func:`recursive_open` to open the files later, though using that function
+is less efficient that :func:`unzipwalk` if you are opening multiple files inside of Zip
+or tar archives.
 
 The yielded file handles can be wrapped in :class:`io.TextIOWrapper` to read them as text files.
 For example, to read all CSV files in the current directory and below, including within compressed files:
@@ -326,8 +328,7 @@ def _inner_recur_open(fh :IO[bytes], fns :tuple[PurePath, ...]) -> Generator[IO[
             with TarFile.open(fileobj=fh) as tf:
                 ef = tf.extractfile(str(fns[1]))
                 if not ef:  # e.g. directory
-                    #TODO Later: is the following fns[0:2] correct?
-                    raise FileNotFoundError(f"not a file? {fns[0:2]}")
+                    raise FileNotFoundError(f"not a file? {fns[0:2]}")  # [0]=the current file, [1]=the file we're trying to open
                 with ef as fh2:
                     with _inner_recur_open(fh2, fns[1:]) as inner:
                         yield inner
@@ -361,7 +362,7 @@ def _inner_recur_open(fh :IO[bytes], fns :tuple[PurePath, ...]) -> Generator[IO[
                 with _inner_recur_open(cast(IO[bytes], fh2), fns[1:]) as inner:
                     yield inner
         else:
-            assert False, 'should be unreachable'  # pragma: no cover
+            assert False, 'should be unreachable: not all file types covered?'  # pragma: no cover
     except GeneratorExit:  # https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/contextmanager-generator-missing-cleanup.html
         pass  # pragma: no cover
 
@@ -373,12 +374,14 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
 
     :func:`unzipwalk` automatically closes files as it iterates through directories and archives;
     this function exists to allow you to open the returned files after the iteration.
+    However, this function will be less efficient that :func:`unzipwalk` if you're opening
+    multiple files inside of Zip or tar archives.
 
-    If *any* of ``encoding``, ``errors``, or ``newline`` is specified, the returned
-    file is wrapped in :class:`io.TextIOWrapper`!
+    .. note: If *any* of ``encoding``, ``errors``, or ``newline`` is specified, the returned
+        file is wrapped in :class:`io.TextIOWrapper`!
 
-    If the last file in the list of files is an archive file, then it won't be decompressed,
-    instead you'll be able to read the archive's raw compressed data from the handle.
+    .. note: If the last file in the list of files is an archive file, then it won't be decompressed,
+        instead you'll be able to read the archive's raw compressed data from the handle.
 
     In this example, we open a gzip-compressed file, stored inside a tgz archive, which
     in turn is stored in a Zip file:
@@ -536,7 +539,7 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
         as its only argument, and returns a boolean value whether this filename should be further processed or not.
         If a file is skipped, a :class:`UnzipWalkResult` of type :class:`FileType.SKIP<FileType>` is yielded.
 
-        *Be aware* that within ZIP and tar archives, all files are basically a flat list, so if your matcher
+        *Be aware* that within Zip and tar archives, all files are basically a flat list, so if your matcher
         excludes a directory inside an archive, it must also exclude all files within that directory as well.
         This behavior is different for physical directories in the file system: if you exclude a directory there,
         it will not be descended into, so you won't have to exclude the files inside (though it's good practice
