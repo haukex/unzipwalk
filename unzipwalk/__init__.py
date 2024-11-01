@@ -3,13 +3,13 @@
 Recursively Walk Into Directories and Archives
 ==============================================
 
-This module primarily provides the function :func:`unzipwalk`, which recursively walks
-into directories and compressed files and returns all files, directories, etc. found,
-together with binary file handles (file objects) for reading the files.
-Currently supported are ZIP, tar, tgz (.tar.gz), bz2, xz, and gz compressed files,
-plus 7zip files if the Python package :mod:`py7zr` is installed.
-You can install this package with ``pip install unzipwalk[7z]`` to get the latter.
-File types are detected based on their extensions.
+This module primarily provides the function :func:`unzipwalk`, which recursively walks into
+directories and compressed files and returns all files, directories, etc. found, together with
+binary file handles (file objects) for reading the files. Currently supported are ``zip``, ``gz``,
+``bz2``,``xz``, and the various ``tar`` compressed formats ``tar.gz``/``tgz``, ``tar.xz``/``txz``,
+and ``tar.bz2``/``tbz``/``tbz2``, plus ``7z`` files if the Python package :mod:`py7zr` is installed
+(to get the latter, you can install this package with ``pip install unzipwalk[7z]``). File types
+are detected based on the aforementioned extensions.
 
     >>> from unzipwalk import unzipwalk
     >>> results = []
@@ -55,31 +55,18 @@ For example, to read all CSV files in the current directory and below, including
     ['Id', 'Name', 'Address']
     ['42', 'Hello', 'World']
 
-Please note that both :func:`unzipwalk` and :func:`recursive_open` can raise a variety of errors:
+.. note::
+    The original names of files compressed with gzip, bzip2, and lzma are derived by
+    simply removing the respective ``.gz``, ``.bz2``, or ``.xz`` extensions.
 
-- :exc:`zipfile.BadZipFile`
-- :exc:`tarfile.TarError`
-- ``py7zr.exceptions.ArchiveError`` and its subclasses like :exc:`py7zr.Bad7zFile`
-- :exc:`gzip.BadGzipFile` - *however*, see the notes in :func:`unzipwalk` about when these are actually raised
-- :exc:`zlib.error`
-- :exc:`lzma.LZMAError`
-- :exc:`EOFError`
-- various :exc:`OSError`\\s
-- other exceptions may be possible
-
-Therefore, you may need to catch all :exc:`Exception`\\s to play it safe.
+    Using the original filename from the gzip file's header is currently not possible due to
+    `limitations in the underlying library <https://github.com/python/cpython/issues/71638>`_.
 
 .. seealso::
     - `zipfile Issues <https://github.com/orgs/python/projects/7>`_
     - `tarfile Issues <https://github.com/orgs/python/projects/11>`_
     - `Compression issues <https://github.com/orgs/python/projects/20>`_ (gzip, bzip2, lzma)
     - `py7zr Issues <https://github.com/miurahr/py7zr/issues>`_
-
-.. note::
-    The original name of a gzip-compressed file is derived from the compressed file's name
-    by simply removing the ``.gz`` extension. Using the original filename from the gzip
-    file's header is currently not possible due to
-    `limitations in the underlying library <https://github.com/python/cpython/issues/71638>`_.
 
 API
 ---
@@ -104,7 +91,7 @@ Command-Line Interface
 .. unzipwalk_clidoc::
 
 The available checksum algorithms may vary depending on your system and Python version.
-Run the command with ``--help`` to see the list of currently available algorithms.
+Run the command with ``--help`` to see the list of algorithms available on your system.
 
 Author, Copyright, and License
 ------------------------------
@@ -171,6 +158,8 @@ class FileType(enum.IntEnum):
     SKIP = enum.auto()
     #: An error was encountered with this file, when the ``raise_errors`` option is off.
     ERROR = enum.auto()
+
+_TARFILE_RE = re.compile(r'\.(?:tar(?:\.gz|\.bz2|\.xz)?|tgz|txz|tbz2?)\Z', re.I)
 
 @runtime_checkable
 class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
@@ -333,7 +322,7 @@ def _inner_recur_open(fh :IO[bytes], fns :tuple[PurePath, ...]) -> Generator[IO[
         if len(fns)==1:
             yield fh
         # the following code is very similar to _proc_file, please see those code comments for details
-        elif bl.endswith('.tar.xz') or bl.endswith('.tar.bz2') or bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
+        elif _TARFILE_RE.search(bl):
             with TarFile.open(fileobj=fh) as tf:
                 ef = tf.extractfile(str(fns[1]))
                 if not ef:  # e.g. directory
@@ -379,6 +368,7 @@ def _inner_recur_open(fh :IO[bytes], fns :tuple[PurePath, ...]) -> Generator[IO[
 @contextmanager
 def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=None) \
         -> Generator[Union[ReadOnlyBinary, io.TextIOWrapper], None, None]:
+    # note Sphinx's "WARNING: py:class reference target not found: _io.TextIOWrapper" can be ignored
     """This context manager allows opening files nested inside archives directly.
 
     :func:`unzipwalk` automatically closes files as it iterates through directories and archives;
@@ -399,8 +389,8 @@ def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=
     Hi, I'm a compressed file!
 
     :raises ImportError: If you try to open a 7z file but :mod:`py7zr` is not installed.
+    :raises Exception: See description in :func:`unzipwalk`.
     """
-    # note Sphinx's "WARNING: py:class reference target not found: _io.TextIOWrapper" can be ignored
     if not fns:
         raise ValueError('no filenames given')
     with open(fns[0], 'rb') as fh:
@@ -416,7 +406,7 @@ FilterType = Callable[[Sequence[PurePath]], bool]
 def _proc_file(fns :tuple[PurePath, ...], fh :IO[bytes], *,  # pylint: disable=too-many-statements,too-many-branches
                matcher :Optional[FilterType], raise_errors :bool) -> Generator[UnzipWalkResult, None, None]:
     bl = fns[-1].name.lower()
-    if bl.endswith('.tar.xz') or bl.endswith('.tar.bz2') or bl.endswith('.tar.gz') or bl.endswith('.tgz') or bl.endswith('.tar'):
+    if _TARFILE_RE.search(bl):
         try:
             with TarFile.open(fileobj=fh, errorlevel=2) as tf:
                 for ti in tf.getmembers():
@@ -541,19 +531,35 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
     """This generator recursively walks into directories and compressed files and yields named tuples of type :class:`UnzipWalkResult`.
 
     :param paths: A filename or iterable of filenames.
+
     :param matcher: When you provide this optional argument, it must be a callable that accepts a sequence of paths
         as its only argument, and returns a boolean value whether this filename should be further processed or not.
         If a file is skipped, a :class:`UnzipWalkResult` of type :class:`FileType.SKIP<FileType>` is yielded.
-    :param raise_errors: When this is turned on (the default), any errors are raised immediately, aborting the iteration.
-        If this is turned off, when decompression errors occur,
-        a :class:`UnzipWalkResult` of type :class:`FileType.ERROR<FileType>` is yielded for those files instead.
-        **However,** be aware that :exc:`gzip.BadGzipFile` errors are not raised until the file is actually read,
-        so you'd need to add an exception handler around your `read()` call to handle such cases.
 
-    If :mod:`py7zr` is not installed, those archives will not be descended into.
+        *Be aware* that within ZIP and tar archives, all files are basically a flat list, so if your matcher
+        excludes a directory inside an archive, it must also exclude all files within that directory as well.
+        This behavior is different for physical directories in the file system: if you exclude a directory there,
+        it will not be descended into, so you won't have to exclude the files inside (though it's good practice
+        to write your matcher to exclude them anyway - see for example :meth:`~pathlib.PurePath.is_relative_to`).
+
+    :param raise_errors: When this is turned on (the default), any errors are raised immediately,
+        aborting the iteration. If this is turned off, when decompression errors occur, a
+        :class:`UnzipWalkResult` of type :class:`FileType.ERROR<FileType>` is yielded for those files instead.
+
+    .. note:: If :mod:`py7zr` is not installed, those archives will not be descended into.
 
     .. note:: Do not rely on the order of results! But see also the discussion in the main documentation about why
         e.g. ``sorted(unzipwalk(...))`` automatically closes files and so may not be what you want.
+
+    :raises Exception: Because of the various underlying libraries, both this function and :func:`recursive_open` can raise
+        a variety of exceptions: :exc:`zipfile.BadZipFile`, :exc:`tarfile.TarError`, ``py7zr.exceptions.ArchiveError``
+        and its subclasses like :exc:`py7zr.Bad7zFile`, :exc:`gzip.BadGzipFile`, :exc:`zlib.error`, :exc:`lzma.LZMAError`,
+        :exc:`EOFError`, various :exc:`OSError`\\s, and other exceptions may be possible. Therefore, you may need to catch
+        all :exc:`Exception`\\s to play it safe.
+
+    .. important:: Errors from :mod:`gzip`, :mod:`bz2`, and :mod:`lzma` (``.gz``, ``.bz2``, and ``.xz`` files,
+        respectively) may not be raised until the file is actually read, so you'll probably also want to add an
+        exception handler around your ``read()`` call!
     """
     def handle(p :Path):
         try:

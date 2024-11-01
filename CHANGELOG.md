@@ -6,7 +6,8 @@ Changelog for unzipwalk
 
 - **Removed** `ReadOnlyBinary.name`
 - More robust and uniform exception handling
-- ...
+- More tar file extensions are now recognized (e.g. `.txz` and `.tbz2`)
+- Documentation improvements
 
 1.7.0 - Thu, Oct 31 2024
 ------------------------
