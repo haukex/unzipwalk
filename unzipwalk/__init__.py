@@ -301,7 +301,7 @@ class UnzipWalkResult(NamedTuple):
             return cls( names=mk_names(m.group(2)), typ=FileType.FILE, hnd=io.BytesIO(bytes.fromhex(m.group(1))) )
         raise ValueError(f"failed to decode checksum line {line!r}")
 
-if py7zr:  # cover-req-lt3.13
+if py7zr:  # cover-req-lt3.13  # pragma: no branch
     def _rd1_7z(sz :py7zr.SevenZipFile, fn :str) -> io.BytesIO:  # pyright: ignore [reportInvalidTypeForm]
         """Read one file from a 7z archive as a BytesIO object."""
         d = sz.read(targets=[str(fn)])

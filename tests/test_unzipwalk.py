@@ -235,7 +235,7 @@ class UnzipWalkTestCase(unittest.TestCase):
                 + [ ( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip")), None, FileType.SKIP ) ]
             ), sorted( (r.names, None if r.hnd is None else r.hnd.read(), r.typ) for r
                 in uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'abc.zip' ) ) )
-        if py7zr:  # cover-req-lt3.13
+        if py7zr:  # cover-req-lt3.13  # pragma: no branch
             # filter a file from 7z file
             self.assertEqual( sorted(
                     [ r for r in self.expect_all if not ( r[0][0].name=='opt.7z' and len(r[0])>1 and r[0][1].name=='wuv.tgz' ) ]
@@ -283,7 +283,7 @@ class UnzipWalkTestCase(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             with uut.recursive_open(("archive.tar.gz", "archive/test2/")):
                 pass  # pragma: no cover
-        if py7zr:  # cover-req-lt3.13
+        if py7zr:  # cover-req-lt3.13  # pragma: no branch
             # 7z bad filename
             with self.assertRaises(FileNotFoundError):
                 with uut.recursive_open(("opt.7z", "bang")):
@@ -388,7 +388,7 @@ class UnzipWalkTestCase(unittest.TestCase):
             list(uut.unzipwalk(self.bad_zips/'not_a.zip.bz2'))
         with self.assertRaises(LZMAError):
             list(uut.unzipwalk(self.bad_zips/'not_a.zip.xz'))
-        if py7zr:  # cover-req-lt3.13
+        if py7zr:  # cover-req-lt3.13  # pragma: no branch
             with self.assertRaises(py7zr.exceptions.ArchiveError):
                 list(uut.unzipwalk(self.bad_zips/'not_a.7z'))
             with self.assertRaises(py7zr.exceptions.ArchiveError):
@@ -457,7 +457,7 @@ class UnzipWalkTestCase(unittest.TestCase):
             for r in uut.unzipwalk((self.bad_zips/'not_a.xz')):  # pragma: no branch
                 if r.hnd is not None:  # pragma: no branch
                     r.hnd.read()
-        if py7zr:  # cover-req-lt3.13
+        if py7zr:  # cover-req-lt3.13  # pragma: no branch
             with self.assertRaises(FileExistsError):
                 with uut.recursive_open((self.bad_zips/"double.7z", "bar.txt")):
                     pass  # pragma: no cover
