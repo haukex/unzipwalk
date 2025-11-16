@@ -1,6 +1,11 @@
 Changelog for unzipwalk
 =======================
 
+1.8.1 - Sun, Nov 16 2025
+------------------------
+
+- Just a rebuild of 1.8.0 with proper permissions in the `.tar.gz` release file.
+
 1.8.0 - Sun, Nov 16 2025
 ------------------------
 
