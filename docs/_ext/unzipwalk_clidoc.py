@@ -2,11 +2,11 @@ import argparse
 from docutils import nodes
 from docutils.parsers.rst import Directive
 from sphinx.application import Sphinx
-import unzipwalk
+import unzipwalk.__main__
 
 class UnzipWalkCli(Directive):
     def run(self):
-        parser = unzipwalk._arg_parser()  # pyright: ignore [reportPrivateUsage]  # pylint: disable=protected-access
+        parser = unzipwalk.__main__._arg_parser()  # pyright: ignore [reportPrivateUsage]  # pylint: disable=protected-access
         # monkey patch this ArgumentParser to fix the output width
         parser._get_formatter = lambda: argparse.HelpFormatter(parser.prog, width=78)  # pylint: disable=protected-access
         return [nodes.literal_block(text=parser.format_help())]

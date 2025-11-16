@@ -39,7 +39,7 @@ dependencies = {file = ["requirements.txt"]}
 "7z" = ["py7zr>=0.22.0"]
 
 [project.scripts]
-unzipwalk = "unzipwalk:main"
+unzipwalk = "unzipwalk.__main__:main"
 
 [project.urls]
 "Repository" = "https://github.com/haukex/unzipwalk"

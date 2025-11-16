@@ -11,5 +11,4 @@ pur == 7.3.3
 build == 1.3.0 ; sys_platform == 'linux'
 twine == 6.2.0 ; sys_platform == 'linux'
 # for this project:
-#TODO: why the restriction to <3.13 on non-win32? (see also coverage markers)
-py7zr == 1.0.0 ; sys_platform != 'win32' or python_version < "3.13"
+py7zr == 1.0.0 ; python_version < "3.14"  # see tests/defs.py for details

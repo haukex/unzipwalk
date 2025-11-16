@@ -263,6 +263,8 @@ Hi, I'm a compressed file!
 
 Interface for the file handle (file object) used in [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
 
+This is essentially the intersection of what the underlying objects support.
+
 #### close() → [None](https://docs.python.org/3/library/constants.html#None)
 
 Close the file.
@@ -318,7 +320,7 @@ Run the command with `--help` to see the list of algorithms available on your sy
 
 ## Author, Copyright, and License
 
-Copyright (c) 2022-2024 Hauke Dämpfling ([haukex@zero-g.net](mailto:haukex@zero-g.net))
+Copyright (c) 2022-2025 Hauke Dämpfling ([haukex@zero-g.net](mailto:haukex@zero-g.net))
 at the Leibniz Institute of Freshwater Ecology and Inland Fisheries (IGB),
 Berlin, Germany, [https://www.igb-berlin.de/](https://www.igb-berlin.de/)
 
