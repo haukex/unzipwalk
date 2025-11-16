@@ -24,6 +24,8 @@ along with this program. If not, see https://www.gnu.org/licenses/
 """
 import ast
 
+# spell-checker: ignore elts
+
 def decode_tuple(code :str) -> tuple[str, ...]:
     """Helper function to parse a string as produced by :func:`repr` from a :class:`tuple` of one or more :class:`str`.
 

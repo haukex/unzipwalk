@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use warnings;
 use strict;
-$^I = ""; # -i command line switch, edit file inplace
+$^I = ""; # -i command line switch, edit file in-place
 my %PFX = (
     '### unzipwalk.unzipwalk(' => 'function-unzipwalk',
     '### *class* unzipwalk.UnzipWalkResult(' => 'unzipwalk.UnzipWalkResult',

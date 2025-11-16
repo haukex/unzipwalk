@@ -1,8 +1,8 @@
 Changelog for unzipwalk
 =======================
 
-1.8.0 - *not yet released*
---------------------------
+1.8.0 - Sun, Nov 16 2025
+------------------------
 
 - **Removed** `ReadOnlyBinary.name`
 - **Added** `UnzipWalkResult.size`
