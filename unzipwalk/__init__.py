@@ -129,6 +129,8 @@ from collections.abc import Generator, Sequence
 from igbpyutils.file import AnyPaths, to_Paths, Filename
 from .defs import FileType, UnzipWalkResult, ReadOnlyBinary, FilterType, FileProcessorArgs, ProcessCallContext, RecursiveOpenArgs
 
+# spell-checker: ignore autoclass autofunction clidoc seealso undoc
+
 __all__ = ['FileType', 'UnzipWalkResult', 'ReadOnlyBinary', 'FilterType', 'recursive_open', 'unzipwalk']
 
 try:  # cover-req-lt3.14
@@ -247,7 +249,7 @@ def _proc_file(a :FileProcessorArgs) -> Generator[UnzipWalkResult, None, None]: 
                             ef = tf.extractfile(ti)  # always binary
                             assert ef is not None, ti  # make type checker happy; we know this is true because we checked it's a file
                             with ef as fh2:
-                                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=fh2, ctx=a.ctx))
+                                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=fh2, size=ti.size, ctx=a.ctx))
                         except Exception:  # pragma: no cover
                             # This can't be covered (yet) because I haven't yet found a way to trigger a TarError here.
                             # Also, https://github.com/python/cpython/issues/120740
@@ -261,7 +263,7 @@ def _proc_file(a :FileProcessorArgs) -> Generator[UnzipWalkResult, None, None]: 
                 raise
             yield UnzipWalkResult(names=a.fns, typ=FileType.ERROR)
         else:
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE)
+            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
     elif bl.endswith('.zip'):
         try:
             with ZipFile(a.fh) as zf:
@@ -281,7 +283,7 @@ def _proc_file(a :FileProcessorArgs) -> Generator[UnzipWalkResult, None, None]: 
                     else:  # (note this interface doesn't have an is_file)
                         try:
                             with zf.open(zi) as fh2:  # always binary mode
-                                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=fh2, ctx=a.ctx))
+                                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=fh2, size=zi.file_size, ctx=a.ctx))
                         except Exception:
                             if a.ctx.raise_errors:
                                 raise
@@ -291,28 +293,28 @@ def _proc_file(a :FileProcessorArgs) -> Generator[UnzipWalkResult, None, None]: 
                 raise
             yield UnzipWalkResult(names=a.fns, typ=FileType.ERROR)
         else:
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE)
+            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
     elif bl.endswith('.7z'):
         if W7Z:  # cover-req-lt3.14
             yield from W7Z.process_7z(a, _proc_file)
         else:  # cover-req-ge3.14
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE)
+            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
     elif bl.endswith('.bz2'):
         new_names = (*a.fns, a.fns[-1].with_suffix(''))
         if a.ctx.matcher is not None and not a.ctx.matcher(new_names):
             yield UnzipWalkResult(names=a.fns, typ=FileType.SKIP)
         else:
             with BZ2File(a.fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
-                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=fh2, ctx=a.ctx))
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE)
+                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=fh2, size=None, ctx=a.ctx))
+            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
     elif bl.endswith('.xz'):
         new_names = (*a.fns, a.fns[-1].with_suffix(''))
         if a.ctx.matcher is not None and not a.ctx.matcher(new_names):
             yield UnzipWalkResult(names=a.fns, typ=FileType.SKIP)
         else:
             with LZMAFile(a.fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
-                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=fh2, ctx=a.ctx))
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE)
+                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=fh2, size=None, ctx=a.ctx))
+            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
     elif bl.endswith('.gz'):
         new_names = (*a.fns, a.fns[-1].with_suffix(''))
         if a.ctx.matcher is not None and not a.ctx.matcher(new_names):
@@ -321,11 +323,11 @@ def _proc_file(a :FileProcessorArgs) -> Generator[UnzipWalkResult, None, None]: 
             with GzipFile(fileobj=a.fh, mode='rb') as fh2:  # always binary, but specify explicitly for clarity
                 # NOTE casting GzipFile to IO[bytes] isn't 100% safe because the former doesn't
                 # implement the full interface, but testing seems to show it's ok...
-                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=cast(IO[bytes], fh2), ctx=a.ctx))
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE)
+                yield from _proc_file(FileProcessorArgs(fns=new_names, fh=cast(IO[bytes], fh2), size=None, ctx=a.ctx))
+            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
     else:
         assert a.fh.readable(), a.fh  # expected by ReadOnlyBinary
-        yield UnzipWalkResult(names=a.fns, typ=FileType.FILE, hnd=a.fh)
+        yield UnzipWalkResult(names=a.fns, typ=FileType.FILE, hnd=a.fh, size=a.size)
 
 def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_errors :bool = True) -> Generator[UnzipWalkResult, None, None]:
     """This generator recursively walks into directories and compressed files and yields named tuples of type :class:`UnzipWalkResult`.
@@ -372,7 +374,8 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
             elif p.is_file():
                 with p.open('rb') as fh:
                     yield from ( r.validate() for r in
-                        _proc_file(FileProcessorArgs(fns=(p,), fh=fh, ctx=ProcessCallContext(matcher=matcher, raise_errors=raise_errors))) )
+                        _proc_file(FileProcessorArgs(fns=(p,), fh=fh, size=p.stat().st_size,
+                            ctx=ProcessCallContext(matcher=matcher, raise_errors=raise_errors))) )
             else:
                 yield UnzipWalkResult(names=(p,), typ=FileType.OTHER).validate()  # cover-not-win32
         except Exception:  # cover-only-linux  # e.g. PermissionError

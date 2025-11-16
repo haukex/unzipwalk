@@ -5,6 +5,7 @@ Changelog for unzipwalk
 --------------------------
 
 - **Removed** `ReadOnlyBinary.name`
+- **Added** `UnzipWalkResult.size`
 - Drop testing for Python 3.9 and add Python 3.14
 - More robust and uniform exception handling
 - More tar file extensions are now recognized (e.g. `.txz` and `.tbz2`)

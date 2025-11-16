@@ -87,6 +87,9 @@ class UnzipWalkResult(NamedTuple):
     #: for reading the file contents in binary mode. Otherwise, this is :obj:`None`.
     #: If this object was produced by :meth:`from_checksum_line`, this handle will read the checksum of the data, *not the data itself!*
     hnd :Optional[ReadOnlyBinary] = None
+    #: When :attr:`typ` is :class:`FileType.FILE<FileType>` or :class:`FileType.ARCHIVE<FileType>`, this field *may* hold the size of the
+    #: file, if the compression format and library support knowing the compressed file's size in advance. Otherwise, this is :obj:`None`.
+    size :Optional[int] = None
 
     def validate(self):
         """Validate whether the object's fields are set properly and throw errors if not.
@@ -107,6 +110,10 @@ class UnzipWalkResult(NamedTuple):
             raise TypeError(f"invalid handle {self.hnd!r}")
         if self.typ!=FileType.FILE and self.hnd is not None:
             raise TypeError(f"invalid handle, should be None but is {self.hnd!r}")
+        if self.typ not in (FileType.FILE, FileType.ARCHIVE) and self.size is not None:
+            raise TypeError(f"invalid size, should be None but is {self.size!r}")
+        if self.size is not None and not isinstance(self.size, int):  # pyright: ignore [reportUnnecessaryIsInstance]
+            raise TypeError(f"invalid size {self.size!r}")
         return self
 
     def checksum_line(self, hash_algo :str, *, raise_errors :bool = True) -> str:
@@ -183,6 +190,7 @@ class FileProcessorArgs(NamedTuple):
     ctx :ProcessCallContext
     fns :tuple[PurePath, ...]
     fh :IO[bytes]
+    size :Optional[int]
 
 FileProcessor = Callable[[FileProcessorArgs], Generator[UnzipWalkResult, None, None]]
 

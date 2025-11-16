@@ -32,11 +32,11 @@ from lzma import LZMAError
 from gzip import BadGzipFile
 from tarfile import TarError
 from zipfile import BadZipFile
-from tempfile import TemporaryDirectory, TemporaryFile
+from tempfile import TemporaryDirectory
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import unzipwalk as uut
 from unzipwalk import FileType
-from .defs import P7Z_EX, EXPECT_7Z, BAD_ZIPS, TestCaseContext, r2e
+from .defs import P7Z_EX, EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
 
 def load_tests(_loader, tests, _ignore):
     globs :dict = {}
@@ -57,7 +57,7 @@ class TestUnzipWalk(unittest.TestCase):
     def test_unzipwalk(self):
         with TestCaseContext() as expect:
             self.assertEqual( expect, sorted( map(r2e, uut.unzipwalk(os.curdir) ) ) )
-            # and again, without 7z
+            # and again, definitely without 7z
             prev = uut.W7Z
             try:  # temporarily pretend 7z is not installed
                 uut.W7Z = None
@@ -77,44 +77,45 @@ class TestUnzipWalk(unittest.TestCase):
         with TestCaseContext() as expect:
             # filter from the initial path list
             self.assertEqual( sorted(
-                    [ r for r in expect if r.fns[0].name != 'more.zip' ] + [ ( (Path("more.zip"),), None, FileType.SKIP ) ]
+                    [ r for r in expect if r.fns[0].name != 'more.zip' ]
+                    + [ ExpectedResult( (Path("more.zip"),), None, FileType.SKIP, None ) ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: p[0].stem.lower()!='more' ) ) ) )
             # filter from zip file
             self.assertEqual( sorted(
                     [ r for r in expect if r.fns[-1].name != 'six.txt' ]
-                    + [ ( (Path("more.zip"), PurePosixPath("more/stuff/six.txt")), None, FileType.SKIP ) ]
+                    + [ ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/six.txt")), None, FileType.SKIP, None ) ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name.lower()!='six.txt' ) ) ) )
             # filter a gz file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='archive.tar.gz' and len(r.fns)>1 and r.fns[1].name == 'world.txt.gz' ) ]
-                    + [ ( (Path("archive.tar.gz"), PurePosixPath("archive/world.txt.gz")), None, FileType.SKIP ) ]
+                    + [ ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/world.txt.gz")), None, FileType.SKIP, None ) ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2].as_posix()!='archive/world.txt.gz' ) ) ) )
             # filter a bz2 file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='formats.tar.bz2' and len(r.fns)>1 and r.fns[1].name == 'bzip2.txt.bz2' ) ]
-                    + [ ( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/bzip2.txt.bz2")), None, FileType.SKIP ) ]
+                    + [ ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/bzip2.txt.bz2")), None, FileType.SKIP, None ) ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2].as_posix()!='formats/bzip2.txt.bz2' ) ) ) )
             # filter an xz file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='formats.tar.bz2' and len(r.fns)>1 and r.fns[1].name == 'lzma.txt.xz' ) ]
-                    + [ ( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/lzma.txt.xz")), None, FileType.SKIP ) ]
+                    + [ ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/lzma.txt.xz")), None, FileType.SKIP, None ) ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2].as_posix()!='formats/lzma.txt.xz' ) ) ) )
             # filter from tar file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( len(r.fns)>1 and r.fns[1].stem=='abc' ) ]
-                    + [ ( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip")), None, FileType.SKIP ) ]
+                    + [ ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip")), None, FileType.SKIP, None ) ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'abc.zip' ) ) ) )
             if P7Z_EX:  # cover-req-lt3.14
                 # filter a file from 7z file
                 self.assertEqual( sorted(
                         [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 and r.fns[1].name=='wuv.tgz' ) ]
-                        + [ ( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP ), ]
+                        + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
                     ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'wuv.tgz' ) ) ) )
                 # filter a directory from a 7z file
                 self.assertEqual( sorted(
                         [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 ) ]
-                        + [ ( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.SKIP ),
-                            ( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP ), ]
+                        + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.SKIP, None ),
+                            ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
                     ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: not ( len(p)>1 and p[1].parts[0] == 'thing' ) ) ) ) )
             else:  # cover-req-ge3.14
                 pass
@@ -163,16 +164,19 @@ class TestUnzipWalk(unittest.TestCase):
 
     def test_result_validate(self):
         with self.assertRaises(ValueError):
-            uut.UnzipWalkResult((), FileType.OTHER, None).validate()
+            uut.UnzipWalkResult((), FileType.OTHER, None, None).validate()
         with self.assertRaises(TypeError):
-            uut.UnzipWalkResult(('foo',), FileType.OTHER, None).validate()  # type: ignore[arg-type]
+            uut.UnzipWalkResult(('foo',), FileType.OTHER, None, None).validate()  # type: ignore[arg-type]
         with self.assertRaises(TypeError):
-            uut.UnzipWalkResult((Path(),), 'foo', None).validate()  # type: ignore[arg-type]
+            uut.UnzipWalkResult((Path(),), 'foo', None, None).validate()  # type: ignore[arg-type]
         with self.assertRaises(TypeError):
-            uut.UnzipWalkResult((Path(),), FileType.FILE, None).validate()
+            uut.UnzipWalkResult((Path(),), FileType.FILE, None, None).validate()
         with self.assertRaises(TypeError):
-            with TemporaryFile() as tf:
-                uut.UnzipWalkResult((Path(),), FileType.OTHER, tf).validate()
+            uut.UnzipWalkResult((Path(),), FileType.OTHER, io.BytesIO(), None).validate()
+        with self.assertRaises(TypeError):
+            uut.UnzipWalkResult((Path(),), FileType.FILE, io.BytesIO(), 'x').validate()  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            uut.UnzipWalkResult((Path(),), FileType.OTHER, None, 42).validate()
 
     def test_checksum_lines(self):
         res = uut.UnzipWalkResult(names=(PurePosixPath('hello'),), typ=FileType.DIR)
@@ -323,7 +327,7 @@ class TestUnzipWalk(unittest.TestCase):
                 list(uut.unzipwalk(td))
             self.assertEqual(
                 sorted( map(r2e, uut.unzipwalk(td, raise_errors=False) ) ),
-                sorted( [ ( (f,), None, FileType.ERROR ), ] ) )
+                sorted( [ ExpectedResult( (f,), None, FileType.ERROR, None ), ] ) )
 
     @unittest.skipIf(condition=P7Z_EX is None, reason='only with 7z support')
     def test_wrap7z(self):  # cover-req-lt3.14

@@ -57,103 +57,88 @@ class ExpectedResult(NamedTuple):
     fns :tuple[PurePath, ...]
     data :Optional[bytes]
     typ :FileType
+    size :Optional[int]
 
 def r2e(r :UnzipWalkResult) -> ExpectedResult:
     """Helper function for tests to simplify comparisons."""
-    return ExpectedResult(fns=r.names, data=None if r.hnd is None else r.hnd.read(), typ=r.typ)
+    return ExpectedResult(fns=r.names, data=None if r.hnd is None else r.hnd.read(), typ=r.typ, size=r.size)
 
 EXPECT :tuple[ExpectedResult, ...] = (
-    ExpectedResult( (Path("test.csv"),), b'"ID","Name","Age"\n1,"Foo",23\n2,"Bar",45\n3,"Quz",67\n', FileType.FILE ),
+    ExpectedResult( (Path("test.csv"),), b'"ID","Name","Age"\n1,"Foo",23\n2,"Bar",45\n3,"Quz",67\n', FileType.FILE, 51 ),
 
-    ExpectedResult( (Path("WinTest.ZIP"),), None, FileType.ARCHIVE ),
-    ExpectedResult( (Path("WinTest.ZIP"), PurePosixPath("Foo.txt")),
-        b"Foo\r\nBar\r\n", FileType.FILE ),
+    ExpectedResult( (Path("WinTest.ZIP"),), None, FileType.ARCHIVE, 240 ),
+    ExpectedResult( (Path("WinTest.ZIP"), PurePosixPath("Foo.txt")), b"Foo\r\nBar\r\n", FileType.FILE, 10 ),
     # Note the WinTest.ZIP doesn't contain an entry for the "World/" dir
     # (this zip was created with Windows Explorer, everything else on Linux)
-    ExpectedResult( (Path("WinTest.ZIP"), PurePosixPath("World/Hello.txt")),
-        b"Hello\r\nWorld", FileType.FILE ),
+    ExpectedResult( (Path("WinTest.ZIP"), PurePosixPath("World/Hello.txt")), b"Hello\r\nWorld", FileType.FILE, 12 ),
 
-    ExpectedResult( (Path("archive.tar.gz"),), None, FileType.ARCHIVE ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/")), None, FileType.DIR ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip")), None, FileType.ARCHIVE ),
+    ExpectedResult( (Path("archive.tar.gz"),), None, FileType.ARCHIVE, 595 ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/")), None, FileType.DIR, None ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip")), None, FileType.ARCHIVE, 359 ),
     ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip"), PurePosixPath("abc.txt")),
-        b"One two three\nfour five six\nseven eight nine\n", FileType.FILE ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip"), PurePosixPath("def.txt")),
-        b"3.14159\n", FileType.FILE ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/iii.dat")),
-        b"jjj\nkkk\nlll\n", FileType.FILE ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/world.txt.gz")), None, FileType.ARCHIVE ),
+        b"One two three\nfour five six\nseven eight nine\n", FileType.FILE, 45 ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip"), PurePosixPath("def.txt")), b"3.14159\n", FileType.FILE, 8 ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/iii.dat")), b"jjj\nkkk\nlll\n", FileType.FILE, 12 ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/world.txt.gz")), None, FileType.ARCHIVE, 43 ),
     ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/world.txt.gz"), PurePosixPath("archive/world.txt")),
-        b"This is a file\n", FileType.FILE ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/xyz.txt")),
-        b"XYZ!\n", FileType.FILE ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/fifo")), None, FileType.OTHER ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/test2/")), None, FileType.DIR ),
-    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/test2/jjj.dat")), None, FileType.SYMLINK ),
+        b"This is a file\n", FileType.FILE, None ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/xyz.txt")), b"XYZ!\n", FileType.FILE, 5 ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/fifo")), None, FileType.OTHER, None ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/test2/")), None, FileType.DIR, None ),
+    ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/test2/jjj.dat")), None, FileType.SYMLINK, None ),
 
-    ExpectedResult( (Path("linktest.zip"),), None, FileType.ARCHIVE ),
-    ExpectedResult( (Path("linktest.zip"), PurePosixPath("linktest/") ), None, FileType.DIR ),
-    ExpectedResult( (Path("linktest.zip"), PurePosixPath("linktest/hello.txt")),
-        b"Hi there\n", FileType.FILE ),
-    ExpectedResult( (Path("linktest.zip"), PurePosixPath("linktest/world.txt")), None, FileType.SYMLINK ),
+    ExpectedResult( (Path("linktest.zip"),), None, FileType.ARCHIVE, 514 ),
+    ExpectedResult( (Path("linktest.zip"), PurePosixPath("linktest/") ), None, FileType.DIR, None ),
+    ExpectedResult( (Path("linktest.zip"), PurePosixPath("linktest/hello.txt")), b"Hi there\n", FileType.FILE, 9 ),
+    ExpectedResult( (Path("linktest.zip"), PurePosixPath("linktest/world.txt")), None, FileType.SYMLINK, None ),
 
-    ExpectedResult( (Path("more.zip"),), None, FileType.ARCHIVE ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/")), None, FileType.DIR ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/")), None, FileType.DIR ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/five.txt")),
-        b"5\n5\n5\n5\n5\n", FileType.FILE ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/six.txt")),
-        b"6\n6\n6\n6\n6\n6\n", FileType.FILE ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/four.txt")),
-        b"4\n4\n4\n4\n", FileType.FILE ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/texts.tgz")), None, FileType.ARCHIVE ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/texts.tgz"), PurePosixPath("one.txt")),
-        b"111\n11\n1\n", FileType.FILE ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/texts.tgz"), PurePosixPath("two.txt")),
-        b"2222\n222\n22\n2\n", FileType.FILE ),
+    ExpectedResult( (Path("more.zip"),), None, FileType.ARCHIVE, 1577 ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/")), None, FileType.DIR, None ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/")), None, FileType.DIR, None ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/five.txt")), b"5\n5\n5\n5\n5\n", FileType.FILE, 10 ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/six.txt")), b"6\n6\n6\n6\n6\n6\n", FileType.FILE, 12 ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/four.txt")), b"4\n4\n4\n4\n", FileType.FILE, 8 ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/texts.tgz")), None, FileType.ARCHIVE, 183 ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/texts.tgz"), PurePosixPath("one.txt")), b"111\n11\n1\n", FileType.FILE, 9 ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/texts.tgz"), PurePosixPath("two.txt")), b"2222\n222\n22\n2\n", FileType.FILE, 14 ),
     ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/texts.tgz"), PurePosixPath("three.txt")),
-        b"33333\n3333\n333\n33\n3\n", FileType.FILE ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/xyz.7z")), None, FileType.ARCHIVE ),
+        b"33333\n3333\n333\n33\n3\n", FileType.FILE, 20 ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/xyz.7z")), None, FileType.ARCHIVE, 245 ),
 
-    ExpectedResult( (Path("opt.7z"),), None, FileType.ARCHIVE ),
+    ExpectedResult( (Path("opt.7z"),), None, FileType.ARCHIVE, 319 ),
 
-    ExpectedResult( (Path("subdir"),), None, FileType.DIR ),
-    ExpectedResult( (Path("subdir","ooo.txt"),),
-        b"oOoOoOo\n\n", FileType.FILE ),
-    ExpectedResult( (Path("subdir","foo.zip"), PurePosixPath("hello.txt")),
-        b"Hallo\nWelt\n", FileType.FILE ),
-    ExpectedResult( (Path("subdir","foo.zip"),), None, FileType.ARCHIVE ),
-    ExpectedResult( (Path("subdir","foo.zip"), PurePosixPath("foo/")), None, FileType.DIR ),
-    ExpectedResult( (Path("subdir","foo.zip"), PurePosixPath("foo/bar.txt")),
-        b"Blah\nblah\n", FileType.FILE ),
+    ExpectedResult( (Path("subdir"),), None, FileType.DIR, None ),
+    ExpectedResult( (Path("subdir","ooo.txt"),), b"oOoOoOo\n\n", FileType.FILE, 9 ),
+    ExpectedResult( (Path("subdir","foo.zip"), PurePosixPath("hello.txt")), b"Hallo\nWelt\n", FileType.FILE, 11 ),
+    ExpectedResult( (Path("subdir","foo.zip"),), None, FileType.ARCHIVE, 474 ),
+    ExpectedResult( (Path("subdir","foo.zip"), PurePosixPath("foo/")), None, FileType.DIR, None ),
+    ExpectedResult( (Path("subdir","foo.zip"), PurePosixPath("foo/bar.txt")), b"Blah\nblah\n", FileType.FILE, 10 ),
 
-    ExpectedResult( (Path("subdir","formats.tar.bz2"),), None, FileType.ARCHIVE ),
-    ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/")), None, FileType.DIR ),
-    ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/lzma.txt.xz")), None, FileType.ARCHIVE ),
+    ExpectedResult( (Path("subdir","formats.tar.bz2"),), None, FileType.ARCHIVE, 376 ),
+    ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/")), None, FileType.DIR, None ),
+    ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/lzma.txt.xz")), None, FileType.ARCHIVE, 72 ),
     ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/lzma.txt.xz"), PurePosixPath("formats/lzma.txt")),
-        b'Another format!\n', FileType.FILE ),
-    ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/bzip2.txt.bz2")), None, FileType.ARCHIVE ),
+        b'Another format!\n', FileType.FILE, None ),
+    ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/bzip2.txt.bz2")), None, FileType.ARCHIVE, 55 ),
     ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/bzip2.txt.bz2"), PurePosixPath("formats/bzip2.txt")),
-        b'And another!\n', FileType.FILE ),
+        b'And another!\n', FileType.FILE, None ),
 )
 EXPECT_7Z :tuple[ExpectedResult, ...] = (
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/xyz.7z"), PurePosixPath("even.txt")),
-        b"Adding", FileType.FILE ),
-    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/xyz.7z"), PurePosixPath("more")),
-        None, FileType.DIR ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/xyz.7z"), PurePosixPath("even.txt")), b"Adding", FileType.FILE, 6 ),
+    ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/xyz.7z"), PurePosixPath("more")), None, FileType.DIR, None ),
     ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/xyz.7z"), PurePosixPath("more/stuff.txt")),
-        b"Testing\r\nTesting", FileType.FILE ),
+        b"Testing\r\nTesting", FileType.FILE, 16 ),
 
-    ExpectedResult( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.DIR ),
-    ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.ARCHIVE ),
-    ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz"), PurePosixPath("uvw.txt")),
-        b"This\nis\na\n7z\ntest\n", FileType.FILE ),
+    ExpectedResult( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.DIR, None ),
+    ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.ARCHIVE, 140 ),
+    ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz"), PurePosixPath("uvw.txt")), b"This\nis\na\n7z\ntest\n", FileType.FILE, 18 ),
 )
 
 @contextmanager
 def TestCaseContext():  # pylint: disable=invalid-name
     with TemporaryDirectory() as td:
         testdir = Path(td)/'zips'
+        # copy to a local temporary directory because this allows the use of symlinks when testing via WSL
         shutil.copytree( Path(__file__).parent.resolve()/'zips', testdir, symlinks=True )
         with Pushd(testdir):
             expect :list[ExpectedResult] = list( deepcopy( EXPECT + (EXPECT_7Z if P7Z_EX else ()) ) )
@@ -161,8 +146,8 @@ def TestCaseContext():  # pylint: disable=invalid-name
                 print('skipping symlink and fifo tests', file=sys.stderr, end='  ')
             else:  # cover-not-win32
                 (testdir/'baz.zip').symlink_to('more.zip')
-                expect.append( ExpectedResult( (Path("baz.zip"),), None, FileType.SYMLINK ) )
+                expect.append( ExpectedResult( (Path("baz.zip"),), None, FileType.SYMLINK, None ) )
                 os.mkfifo(testdir/'xy.fifo')  # pyright: ignore [reportAttributeAccessIssue]  # pylint: disable=no-member,useless-suppression
-                expect.append( ExpectedResult( (Path("xy.fifo"),), None, FileType.OTHER ) )
+                expect.append( ExpectedResult( (Path("xy.fifo"),), None, FileType.OTHER, None ) )
             expect.sort()
             yield expect

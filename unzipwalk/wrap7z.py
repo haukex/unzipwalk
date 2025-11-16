@@ -101,10 +101,10 @@ class Wrap7Z:  # cover-req-lt3.14
                                 raise
                             yield UnzipWalkResult(names=new_names, typ=FileType.ERROR)
                         else:
-                            yield from recurse(FileProcessorArgs(fns=new_names, fh=bio, ctx=a.ctx))
+                            yield from recurse(FileProcessorArgs(fns=new_names, fh=bio, size=f7.uncompressed, ctx=a.ctx))
         except Exception:  # pylint: disable=[duplicate-code]
             if a.ctx.raise_errors:
                 raise
             yield UnzipWalkResult(names=a.fns, typ=FileType.ERROR)
         else:  # pylint: disable=[duplicate-code]
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE)
+            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)

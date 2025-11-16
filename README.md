@@ -119,7 +119,7 @@ exception handler around your `read()` call!
 
 <a id="unzipwalk.UnzipWalkResult"></a>
 
-### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/library/constants.html#None) = None)
+### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/library/constants.html#None) = None, size: [int](https://docs.python.org/3/library/functions.html#int) | [None](https://docs.python.org/3/library/constants.html#None) = None)
 
 Return type for [`unzipwalk()`](#function-unzipwalk).
 
@@ -138,6 +138,11 @@ A [`FileType`](#unzipwalk.FileType) value representing the type of the current f
 When [`typ`](#unzipwalk.UnzipWalkResult.typ) is [`FileType.FILE`](#unzipwalk.FileType), this is a [`ReadOnlyBinary`](#unzipwalk.ReadOnlyBinary) file handle (file object)
 for reading the file contents in binary mode. Otherwise, this is [`None`](https://docs.python.org/3/library/constants.html#None).
 If this object was produced by [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line), this handle will read the checksum of the data, *not the data itself!*
+
+#### size *: [int](https://docs.python.org/3/library/functions.html#int) | [None](https://docs.python.org/3/library/constants.html#None)*
+
+When [`typ`](#unzipwalk.UnzipWalkResult.typ) is [`FileType.FILE`](#unzipwalk.FileType) or [`FileType.ARCHIVE`](#unzipwalk.FileType), this field *may* hold the size of the
+file, if the compression format and library support knowing the compressed file’s size in advance. Otherwise, this is [`None`](https://docs.python.org/3/library/constants.html#None).
 
 #### validate()
 
@@ -310,9 +315,9 @@ options:
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future
 versions. For more control, use the library instead of this command-line tool.
-** Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, mdc2,
-ripemd160, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384,
-sha3_512, sha512, sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
+** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, ripemd160, sha1,
+sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
+sha512_224, sha512_256, shake_128, shake_256, sm3
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.
