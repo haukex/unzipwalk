@@ -5,20 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "unzipwalk"
 description = "Recursively walk into directories and archives"
-version = "1.7.0"
+version = "1.8.0"
 authors = [ { name="Hauke D", email="haukex@zero-g.net" } ]
+# https://spdx.org/licenses/
+license = "LGPL-3.0-or-later"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["dependencies"]
 # https://pypi.org/classifiers/
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Programming Language :: Python :: 3.14",
     "Development Status :: 5 - Production/Stable",
     "Operating System :: POSIX",
     "Operating System :: Unix",
@@ -68,7 +69,6 @@ reportMissingParameterType = "none"
 reportMissingTypeArgument = "none"
 reportGeneralTypeIssues = "none"  # too bad there isn't more fine-grained control than this
 reportUnnecessaryTypeIgnoreComment = "none"  # this flags too many comments; we use mypy's `warn_unused_ignores` instead
-reportShadowedImports = "warning"
 reportImportCycles = "error"
 reportPropertyTypeMismatch = "warning"
 
@@ -163,10 +163,6 @@ ignored-modules = ["ldap"]
 # number of processors available to use, and will cap the count on Windows to
 # avoid hangs.
 jobs = 0
-
-# When enabled, pylint would attempt to guess common misconfiguration and emit
-# user-friendly hints instead of false-positive error messages.
-suggestion-mode = true
 
 [tool.pylint.basic]
 

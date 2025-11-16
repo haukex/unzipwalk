@@ -44,7 +44,7 @@ tasklist:	## List open tasks.
 
 installdeps:  ## Install project dependencies
 	@set -euxo pipefail
-	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location pip wheel
+	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location pip
 	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location $(foreach x,$(requirement_txts),-r $(x))
 	# $(PYTHON3BIN) -m pip install --editable .  # for modules/packages
 	# other examples: git lfs install / npm ci
