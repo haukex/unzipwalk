@@ -36,7 +36,7 @@ from tempfile import TemporaryDirectory
 from contextlib import redirect_stdout, redirect_stderr
 import unzipwalk.__main__ as uut
 from unzipwalk import FileType
-from .defs import P7Z_EX, BAD_ZIPS, TestCaseContext, ResultType
+from .defs import P7Z_EX, BAD_ZIPS, TestCaseContext, ExpectedResult
 
 # spell-checker: ignore csha rcmd
 
@@ -60,7 +60,7 @@ class TestUnzipWalkCli(unittest.TestCase):
         return lines
 
     def test_cli(self):
-        expect :list[ResultType]
+        expect :list[ExpectedResult]
         with TestCaseContext() as expect:
             exp_basic = sorted( f"FILE {tuple(str(n) for n in e.fns)!r}" for e in expect if e.typ==FileType.FILE )
             self.assertEqual( self._run_cli([]), exp_basic )  # basic
