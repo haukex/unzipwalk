@@ -2,13 +2,13 @@
 
 # Recursively Walk Into Directories and Archives
 
-This module primarily provides the function [`unzipwalk()`](#function-unzipwalk), which recursively walks
-into directories and compressed files and returns all files, directories, etc. found,
-together with binary file handles (file objects) for reading the files.
-Currently supported are ZIP, tar, tgz (.tar.gz), bz2, xz, and gz compressed files,
-plus 7zip files if the Python package [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is installed.
-You can install this package with `pip install unzipwalk[7z]` to get the latter.
-File types are detected based on their extensions.
+This module primarily provides the function [`unzipwalk()`](#function-unzipwalk), which recursively walks into
+directories and compressed files and returns all files, directories, etc. found, together with
+binary file handles (file objects) for reading the files. Currently supported are `zip`, `gz`,
+`bz2`, `xz`, and the various `tar` compressed formats `tar.gz`/`tgz`, `tar.xz`/`txz`,
+and `tar.bz2`/`tbz`/`tbz2`, plus `7z` files if the Python package [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is installed
+(to get the latter, you can install this package with `pip install unzipwalk[7z]`). File types
+are detected based on the aforementioned extensions.
 
 ```pycon
 >>> from unzipwalk import unzipwalk
@@ -37,7 +37,9 @@ something as seemingly simple as `sorted(unzipwalk('.'))` would cause the code a
 because all files will have been opened and closed during the call to [`sorted()`](https://docs.python.org/3/library/functions.html#sorted)
 and the handles to read the data would no longer be available in the body of the loop.
 This is why the above example first processes all the files before sorting the results.
-You can also use [`recursive_open()`](#unzipwalk.recursive_open) to open the files later.
+You can also use [`recursive_open()`](#unzipwalk.recursive_open) to open the files later, though using that function
+is less efficient that [`unzipwalk()`](#function-unzipwalk) if you are opening multiple files inside of Zip
+or tar archives.
 
 The yielded file handles can be wrapped in [`io.TextIOWrapper`](https://docs.python.org/3/library/io.html#io.TextIOWrapper) to read them as text files.
 For example, to read all CSV files in the current directory and below, including within compressed files:
@@ -58,31 +60,18 @@ For example, to read all CSV files in the current directory and below, including
 ['42', 'Hello', 'World']
 ```
 
-Please note that both [`unzipwalk()`](#function-unzipwalk) and [`recursive_open()`](#unzipwalk.recursive_open) can raise a variety of errors:
+#### NOTE
+The original names of files compressed with gzip, bzip2, and lzma are derived by
+simply removing the respective `.gz`, `.bz2`, or `.xz` extensions.
 
-- [`zipfile.BadZipFile`](https://docs.python.org/3/library/zipfile.html#zipfile.BadZipFile)
-- [`tarfile.TarError`](https://docs.python.org/3/library/tarfile.html#tarfile.TarError)
-- `py7zr.exceptions.ArchiveError` and its subclasses like [`py7zr.Bad7zFile`](https://py7zr.readthedocs.io/en/stable/api.html#py7zr.Bad7zFile)
-- [`gzip.BadGzipFile`](https://docs.python.org/3/library/gzip.html#gzip.BadGzipFile) - *however*, see the notes in [`unzipwalk()`](#function-unzipwalk) about when these are actually raised
-- [`zlib.error`](https://docs.python.org/3/library/zlib.html#zlib.error)
-- [`lzma.LZMAError`](https://docs.python.org/3/library/lzma.html#lzma.LZMAError)
-- [`EOFError`](https://docs.python.org/3/library/exceptions.html#EOFError)
-- various [`OSError`](https://docs.python.org/3/library/exceptions.html#OSError)s
-- other exceptions may be possible
-
-Therefore, you may need to catch all [`Exception`](https://docs.python.org/3/library/exceptions.html#Exception)s to play it safe.
+Using the original filename from the gzip file’s header is currently not possible due to
+[limitations in the underlying library](https://github.com/python/cpython/issues/71638).
 
 #### SEE ALSO
 - [zipfile Issues](https://github.com/orgs/python/projects/7)
 - [tarfile Issues](https://github.com/orgs/python/projects/11)
 - [Compression issues](https://github.com/orgs/python/projects/20) (gzip, bzip2, lzma)
 - [py7zr Issues](https://github.com/miurahr/py7zr/issues)
-
-#### NOTE
-The original name of a gzip-compressed file is derived from the compressed file’s name
-by simply removing the `.gz` extension. Using the original filename from the gzip
-file’s header is currently not possible due to
-[limitations in the underlying library](https://github.com/python/cpython/issues/71638).
 
 ## API
 
@@ -94,20 +83,39 @@ This generator recursively walks into directories and compressed files and yield
 
 * **Parameters:**
   * **paths** – A filename or iterable of filenames.
-  * **matcher** – When you provide this optional argument, it must be a callable that accepts a sequence of paths
+  * **matcher** – 
+
+    When you provide this optional argument, it must be a callable that accepts a sequence of paths
     as its only argument, and returns a boolean value whether this filename should be further processed or not.
     If a file is skipped, a [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.SKIP`](#unzipwalk.FileType) is yielded.
-  * **raise_errors** – When this is turned on (the default), any errors are raised immediately, aborting the iteration.
-    If this is turned off, when decompression errors occur,
-    a [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.ERROR`](#unzipwalk.FileType) is yielded for those files instead.
-    **However,** be aware that [`gzip.BadGzipFile`](https://docs.python.org/3/library/gzip.html#gzip.BadGzipFile) errors are not raised until the file is actually read,
-    so you’d need to add an exception handler around your read() call to handle such cases.
 
+    *Be aware* that within Zip and tar archives, all files are basically a flat list, so if your matcher
+    excludes a directory inside an archive, it must also exclude all files within that directory as well.
+    This behavior is different for physical directories in the file system: if you exclude a directory there,
+    it will not be descended into, so you won’t have to exclude the files inside (though it’s good practice
+    to write your matcher to exclude them anyway - see for example [`is_relative_to()`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.is_relative_to)).
+  * **raise_errors** – When this is turned on (the default), any errors are raised immediately,
+    aborting the iteration. If this is turned off, when decompression errors occur, a
+    [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.ERROR`](#unzipwalk.FileType) is yielded for those files instead.
+
+#### NOTE
 If [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is not installed, those archives will not be descended into.
 
 #### NOTE
 Do not rely on the order of results! But see also the discussion in the main documentation about why
 e.g. `sorted(unzipwalk(...))` automatically closes files and so may not be what you want.
+
+* **Raises:**
+  [**Exception**](https://docs.python.org/3/library/exceptions.html#Exception) – Because of the various underlying libraries, both this function and [`recursive_open()`](#unzipwalk.recursive_open) can raise
+  a variety of exceptions: [`zipfile.BadZipFile`](https://docs.python.org/3/library/zipfile.html#zipfile.BadZipFile), [`tarfile.TarError`](https://docs.python.org/3/library/tarfile.html#tarfile.TarError), `py7zr.exceptions.ArchiveError`
+  and its subclasses like [`py7zr.Bad7zFile`](https://py7zr.readthedocs.io/en/stable/api.html#py7zr.Bad7zFile), [`gzip.BadGzipFile`](https://docs.python.org/3/library/gzip.html#gzip.BadGzipFile), [`zlib.error`](https://docs.python.org/3/library/zlib.html#zlib.error), [`lzma.LZMAError`](https://docs.python.org/3/library/lzma.html#lzma.LZMAError),
+  [`EOFError`](https://docs.python.org/3/library/exceptions.html#EOFError), various [`OSError`](https://docs.python.org/3/library/exceptions.html#OSError)s, and other exceptions may be possible. Therefore, you may need to catch
+  all [`Exception`](https://docs.python.org/3/library/exceptions.html#Exception)s to play it safe.
+
+#### IMPORTANT
+Errors from [`gzip`](https://docs.python.org/3/library/gzip.html#module-gzip), [`bz2`](https://docs.python.org/3/library/bz2.html#module-bz2), and [`lzma`](https://docs.python.org/3/library/lzma.html#module-lzma) (`.gz`, `.bz2`, and `.xz` files,
+respectively) may not be raised until the file is actually read, so you’ll probably also want to add an
+exception handler around your `read()` call!
 
 <a id="unzipwalk.UnzipWalkResult"></a>
 
@@ -227,12 +235,13 @@ This context manager allows opening files nested inside archives directly.
 
 [`unzipwalk()`](#function-unzipwalk) automatically closes files as it iterates through directories and archives;
 this function exists to allow you to open the returned files after the iteration.
+However, this function will be less efficient that [`unzipwalk()`](#function-unzipwalk) if you’re opening
+multiple files inside of Zip or tar archives.
 
-If *any* of `encoding`, `errors`, or `newline` is specified, the returned
-file is wrapped in [`io.TextIOWrapper`](https://docs.python.org/3/library/io.html#io.TextIOWrapper)!
-
-If the last file in the list of files is an archive file, then it won’t be decompressed,
-instead you’ll be able to read the archive’s raw compressed data from the handle.
+<!-- note: If *any* of ``encoding``, ``errors``, or ``newline`` is specified, the returned
+file is wrapped in :class:`io.TextIOWrapper`! -->
+<!-- note: If the last file in the list of files is an archive file, then it won't be decompressed,
+instead you'll be able to read the archive's raw compressed data from the handle. -->
 
 In this example, we open a gzip-compressed file, stored inside a tgz archive, which
 in turn is stored in a Zip file:
@@ -245,24 +254,14 @@ Hi, I'm a compressed file!
 ```
 
 * **Raises:**
-  [**ImportError**](https://docs.python.org/3/library/exceptions.html#ImportError) – If you try to open a 7z file but [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is not installed.
+  * [**ImportError**](https://docs.python.org/3/library/exceptions.html#ImportError) – If you try to open a 7z file but [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is not installed.
+  * [**Exception**](https://docs.python.org/3/library/exceptions.html#Exception) – See description in [`unzipwalk()`](#function-unzipwalk).
 
 <a id="unzipwalk.ReadOnlyBinary"></a>
 
 ### *class* unzipwalk.ReadOnlyBinary(\*args, \*\*kwargs)
 
 Interface for the file handle (file object) used in [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
-
-#### *property* name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
-
-The name of the file.
-
-#### Deprecated
-Deprecated since version 1.7.0: Deprecated because not all underlying classes implement this.
-Filenames are provided by [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
-
-#### WARNING
-Will be removed in 1.8.0! (TODO)
 
 #### close() → [None](https://docs.python.org/3/library/constants.html#None)
 
@@ -273,7 +272,7 @@ Close the file.
 
 #### *property* closed *: [bool](https://docs.python.org/3/library/functions.html#bool)*
 
-#### readable() → [Literal](https://docs.python.org/3/library/typing.html#typing.Literal)[True]
+#### readable() → [bool](https://docs.python.org/3/library/functions.html#bool)
 
 #### read(n: [int](https://docs.python.org/3/library/functions.html#int) = -1, /) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
 
@@ -294,7 +293,7 @@ Recursively walk into directories and archives
 positional arguments:
   PATH                  paths to process (default is current directory)
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -a, --all-files       also list dirs, symlinks, etc.
   -d, --dump            also dump file contents
@@ -309,13 +308,13 @@ optional arguments:
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future
 versions. For more control, use the library instead of this command-line tool.
-** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, ripemd160, sha1,
-sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
-sha512_224, sha512_256, shake_128, shake_256, sm3
+** Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, mdc2,
+ripemd160, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384,
+sha3_512, sha512, sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.
-Run the command with `--help` to see the list of currently available algorithms.
+Run the command with `--help` to see the list of algorithms available on your system.
 
 ## Author, Copyright, and License
 

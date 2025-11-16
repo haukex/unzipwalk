@@ -6,7 +6,7 @@ Recursively Walk Into Directories and Archives
 This module primarily provides the function :func:`unzipwalk`, which recursively walks into
 directories and compressed files and returns all files, directories, etc. found, together with
 binary file handles (file objects) for reading the files. Currently supported are ``zip``, ``gz``,
-``bz2``,``xz``, and the various ``tar`` compressed formats ``tar.gz``/``tgz``, ``tar.xz``/``txz``,
+``bz2``, ``xz``, and the various ``tar`` compressed formats ``tar.gz``/``tgz``, ``tar.xz``/``txz``,
 and ``tar.bz2``/``tbz``/``tbz2``, plus ``7z`` files if the Python package :mod:`py7zr` is installed
 (to get the latter, you can install this package with ``pip install unzipwalk[7z]``). File types
 are detected based on the aforementioned extensions.
