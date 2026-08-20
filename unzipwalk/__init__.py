@@ -133,10 +133,10 @@ from .defs import FileType, UnzipWalkResult, ReadOnlyBinary, FilterType, FilePro
 
 __all__ = ['FileType', 'UnzipWalkResult', 'ReadOnlyBinary', 'FilterType', 'recursive_open', 'unzipwalk']
 
-try:  # cover-req-lt3.14
+try:
     from .wrap7z import Wrap7Z
     W7Z :Optional[Wrap7Z] = Wrap7Z()  # pylint: disable=invalid-name,useless-suppression
-except (ImportError, OSError):  # cover-req-ge3.14
+except (ImportError, OSError):  # pragma: no cover  # tests check this case by manually setting W7Z=None
     W7Z = None  # pylint: disable=invalid-name,useless-suppression  # pyright: ignore [reportConstantRedefinition]
 
 _TARFILE_RE = re.compile(r'\.(?:tar(?:\.gz|\.bz2|\.xz)?|tgz|txz|tbz2?)\Z', re.I)
@@ -164,9 +164,9 @@ def _inner_recur_open(a: RecursiveOpenArgs) -> Generator[IO[bytes], None, None]:
                     with _inner_recur_open(RecursiveOpenArgs(fns=a.fns[1:], fh=fh2)) as inner:  # pragma: no branch
                         yield inner
         elif bl.endswith('.7z'):
-            if W7Z:  # cover-req-lt3.14
+            if W7Z:
                 yield from W7Z.recursive_open(a, _inner_recur_open)
-            else:  # cover-req-ge3.14
+            else:
                 raise ImportError("The py7zr package must be installed to open 7z files.")
         elif bl.endswith('.bz2'):
             if a.fns[1] != a.fns[0].with_suffix(''):
@@ -295,9 +295,9 @@ def _proc_file(a :FileProcessorArgs) -> Generator[UnzipWalkResult, None, None]: 
         else:
             yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
     elif bl.endswith('.7z'):
-        if W7Z:  # cover-req-lt3.14
+        if W7Z:
             yield from W7Z.process_7z(a, _proc_file)
-        else:  # cover-req-ge3.14
+        else:
             yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
     elif bl.endswith('.bz2'):
         new_names = (*a.fns, a.fns[-1].with_suffix(''))

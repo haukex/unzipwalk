@@ -12,4 +12,4 @@ pur == 7.4.0
 build == 1.5.0 ; sys_platform == 'linux'
 twine == 7.0.0 ; sys_platform == 'linux'
 # for this project:
-py7zr == 1.0.0 ; python_version < "3.14"  # see tests/defs.py for details; remember to update version in pyproject.toml too
+py7zr == 1.1.3

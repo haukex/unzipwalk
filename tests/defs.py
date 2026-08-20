@@ -25,7 +25,6 @@ along with this program. If not, see https://www.gnu.org/licenses/
 import os
 import sys
 import shutil
-import importlib
 from copy import deepcopy
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
@@ -35,21 +34,6 @@ from igbpyutils.file import Pushd
 from unzipwalk import FileType, UnzipWalkResult
 
 # spell-checker: ignore linktest nlll Pushd mkfifo
-
-# py7zr 1.0.0 supports 3.13, but not 3.14: https://github.com/miurahr/py7zr/issues/683
-# When it does, we can adjust the corresponding cover-... comments (and dev/requirements.txt)
-def _try_py7zr() -> Optional[Exception]:
-    """Returns an :exc:`py7zr.exceptions.ArchiveError` instance, or :obj:`None` if _:mod:`py7zr` is not installed.
-    NOTE this is also used by the tests as a flag to check if :mod:`py7zr` is installed or not."""
-    try:  # cover-req-lt3.14  # pylint: disable=no-else-return
-        m = importlib.import_module('py7zr.exceptions')
-    except (ImportError, OSError):  # cover-req-ge3.14
-        return None
-    else:  # cover-req-lt3.14
-        ex = getattr(m, 'ArchiveError')()
-        assert isinstance(ex, Exception)
-        return ex
-P7Z_EX = _try_py7zr()
 
 BAD_ZIPS = Path(__file__).parent.resolve()/'bad_zips'
 
@@ -141,7 +125,7 @@ def TestCaseContext():  # pylint: disable=invalid-name
         # copy to a local temporary directory because this allows the use of symlinks when testing via WSL
         shutil.copytree( Path(__file__).parent.resolve()/'zips', testdir, symlinks=True )
         with Pushd(testdir):
-            expect :list[ExpectedResult] = list( deepcopy( EXPECT + (EXPECT_7Z if P7Z_EX else ()) ) )
+            expect :list[ExpectedResult] = list( deepcopy( EXPECT + EXPECT_7Z ) )
             if sys.platform.startswith('win32'):  # cover-only-win32
                 print('skipping symlink and fifo tests', file=sys.stderr, end='  ')
             else:  # cover-not-win32

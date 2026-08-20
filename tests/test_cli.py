@@ -36,7 +36,7 @@ from tempfile import TemporaryDirectory
 from contextlib import redirect_stdout, redirect_stderr
 import unzipwalk.__main__ as uut
 from unzipwalk import FileType
-from .defs import P7Z_EX, BAD_ZIPS, TestCaseContext, ExpectedResult
+from .defs import BAD_ZIPS, TestCaseContext, ExpectedResult
 
 # spell-checker: ignore csha rcmd
 
@@ -110,12 +110,11 @@ class TestUnzipWalkCli(unittest.TestCase):
             # the following is commented out due to https://github.com/python/cpython/issues/120740
             #"ERROR ('bad.tar.gz', 'b')",
             #"FILE ('bad.tar.gz', 'c') b'Three\\n'",
-        ] + ([
             "ERROR ('bad.7z', 'broken.txt')",
             "ERROR ('double.7z', 'bar.txt')",
             "ERROR ('double.7z', 'bar.txt')",
             "ERROR ('not_a.7z',)",
-        ] if P7Z_EX else []) ) )
+        ] ) )
         self.assertEqual( self._run_cli(['-cmd5','.','does_not_exist']), sorted( [
             "# ERROR does_not_exist",
             "# ERROR ('not_a.gz', 'not_a')",
@@ -137,12 +136,11 @@ class TestUnzipWalkCli(unittest.TestCase):
             # the following is commented out due to https://github.com/python/cpython/issues/120740
             #"# ERROR ('bad.tar.gz', 'b')",
             #"38a460ffb4cfb15460b4b679ce534181 *('bad.tar.gz', 'c')",
-        ] + ([
             "# ERROR not_a.7z",
             "# ERROR ('bad.7z', 'broken.txt')",
             "# ERROR ('double.7z', 'bar.txt')",
             "# ERROR ('double.7z', 'bar.txt')",
-        ] if P7Z_EX else []) ) )
+        ] ) )
         with self.assertRaises(BadGzipFile):
             self._run_cli(['-rd','not_a.gz'])
         with self.assertRaises(BadGzipFile):

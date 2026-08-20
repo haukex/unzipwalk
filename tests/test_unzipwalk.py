@@ -34,9 +34,10 @@ from tarfile import TarError
 from zipfile import BadZipFile
 from tempfile import TemporaryDirectory
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from py7zr.exceptions import ArchiveError
 import unzipwalk as uut
 from unzipwalk import FileType
-from .defs import P7Z_EX, EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
+from .defs import EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
 
 def load_tests(_loader, tests, _ignore):
     globs :dict = {}
@@ -105,20 +106,17 @@ class TestUnzipWalk(unittest.TestCase):
                     [ r for r in expect if not ( len(r.fns)>1 and r.fns[1].stem=='abc' ) ]
                     + [ ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip")), None, FileType.SKIP, None ) ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'abc.zip' ) ) ) )
-            if P7Z_EX:  # cover-req-lt3.14
-                # filter a file from 7z file
-                self.assertEqual( sorted(
-                        [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 and r.fns[1].name=='wuv.tgz' ) ]
-                        + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
-                    ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'wuv.tgz' ) ) ) )
-                # filter a directory from a 7z file
-                self.assertEqual( sorted(
-                        [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 ) ]
-                        + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.SKIP, None ),
-                            ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
-                    ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: not ( len(p)>1 and p[1].parts[0] == 'thing' ) ) ) ) )
-            else:  # cover-req-ge3.14
-                pass
+            # filter a file from 7z file
+            self.assertEqual( sorted(
+                    [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 and r.fns[1].name=='wuv.tgz' ) ]
+                    + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
+                ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'wuv.tgz' ) ) ) )
+            # filter a directory from a 7z file
+            self.assertEqual( sorted(
+                    [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 ) ]
+                    + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.SKIP, None ),
+                        ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
+                ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: not ( len(p)>1 and p[1].parts[0] == 'thing' ) ) ) ) )
 
     def test_recursive_open(self):
         with TestCaseContext() as expect:
@@ -154,13 +152,10 @@ class TestUnzipWalk(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 with uut.recursive_open(("archive.tar.gz", "archive/test2/")):
                     pass  # pragma: no cover
-            if P7Z_EX:  # cover-req-lt3.14
-                # 7z bad filename
-                with self.assertRaises(FileNotFoundError):
-                    with uut.recursive_open(("opt.7z", "bang")):
-                        pass  # pragma: no cover
-            else:  # cover-req-ge3.14
-                pass
+            # 7z bad filename
+            with self.assertRaises(FileNotFoundError):
+                with uut.recursive_open(("opt.7z", "bang")):
+                    pass  # pragma: no cover
 
     def test_result_validate(self):
         with self.assertRaises(ValueError):
@@ -231,7 +226,8 @@ class TestUnzipWalk(unittest.TestCase):
             list(uut.unzipwalk(BAD_ZIPS/'not_a.tgz'))
         with self.assertRaises(BadGzipFile):
             list(uut.unzipwalk(BAD_ZIPS/'not_a.tgz.gz'))
-        with self.assertRaises(EOFError):
+        # apparently, some Python versions now throw a ValueError instead
+        with self.assertRaises((EOFError, ValueError)):
             list(uut.unzipwalk(BAD_ZIPS/'not_a.tgz.bz2'))
         with self.assertRaises(BadZipFile):
             list(uut.unzipwalk(BAD_ZIPS/'not_a.zip.gz'))
@@ -239,15 +235,12 @@ class TestUnzipWalk(unittest.TestCase):
             list(uut.unzipwalk(BAD_ZIPS/'not_a.zip.bz2'))
         with self.assertRaises(LZMAError):
             list(uut.unzipwalk(BAD_ZIPS/'not_a.zip.xz'))
-        if P7Z_EX:  # cover-req-lt3.14
-            with self.assertRaises(type(P7Z_EX)):
-                list(uut.unzipwalk(BAD_ZIPS/'not_a.7z'))
-            with self.assertRaises(type(P7Z_EX)):
-                list(uut.unzipwalk(BAD_ZIPS/'bad.7z'))
-            with self.assertRaises(FileExistsError):
-                list(uut.unzipwalk(BAD_ZIPS/'double.7z'))
-        else:  # cover-req-ge3.14
-            pass
+        with self.assertRaises(ArchiveError):
+            list(uut.unzipwalk(BAD_ZIPS/'not_a.7z'))
+        with self.assertRaises(ArchiveError):
+            list(uut.unzipwalk(BAD_ZIPS/'bad.7z'))
+        with self.assertRaises(FileExistsError):
+            list(uut.unzipwalk(BAD_ZIPS/'double.7z'))
         with self.assertRaises(RuntimeError):
             list(uut.unzipwalk(BAD_ZIPS/'features.zip'))
         # the following is commented out due to https://github.com/python/cpython/issues/120740
@@ -295,8 +288,6 @@ class TestUnzipWalk(unittest.TestCase):
                  ( (BAD_ZIPS/"double.7z", PurePosixPath("bar.txt")), None, FileType.ERROR ),
                  ( (BAD_ZIPS/"bad.7z", PurePosixPath("broken.txt")), None, FileType.ERROR ),  # bad checksum
                  ( (BAD_ZIPS/"not_a.7z",), None, FileType.ERROR ),
-                ] if P7Z_EX else [
-                 ( (BAD_ZIPS/"not_a.7z",), None, FileType.ARCHIVE ),
                 ]) ) )
         with self.assertRaises(BadGzipFile):
             for r in uut.unzipwalk((BAD_ZIPS/'not_a.gz')):  # pragma: no branch
@@ -310,12 +301,9 @@ class TestUnzipWalk(unittest.TestCase):
             for r in uut.unzipwalk((BAD_ZIPS/'not_a.xz')):  # pragma: no branch
                 assert r.hnd is not None
                 r.hnd.read()
-        if P7Z_EX:  # cover-req-lt3.14
-            with self.assertRaises(FileExistsError):
-                with uut.recursive_open((BAD_ZIPS/"double.7z", "bar.txt")):
-                    pass  # pragma: no cover
-        else:  # cover-req-ge3.14
-            pass
+        with self.assertRaises(FileExistsError):
+            with uut.recursive_open((BAD_ZIPS/"double.7z", "bar.txt")):
+                pass  # pragma: no cover
 
     @unittest.skipIf(condition=not sys.platform.startswith('linux'), reason='only on Linux')
     def test_errors_linux(self):  # cover-only-linux
@@ -329,8 +317,7 @@ class TestUnzipWalk(unittest.TestCase):
                 sorted( map(r2e, uut.unzipwalk(td, raise_errors=False) ) ),
                 sorted( [ ExpectedResult( (f,), None, FileType.ERROR, None ), ] ) )
 
-    @unittest.skipIf(condition=P7Z_EX is None, reason='only with 7z support')
-    def test_wrap7z(self):  # cover-req-lt3.14
+    def test_wrap7z(self):
         from unzipwalk.wrap7z import Py7zBytesIO, SingleBytesIOFactory  # pylint: disable=import-outside-toplevel
         pio = Py7zBytesIO(io.BytesIO(b'abc'))
         self.assertEqual(pio.size(), 3)

@@ -28,12 +28,12 @@ from pathlib import PurePosixPath
 from io import BytesIO
 # If py7zr isn't available, the following line will raise an exception, causing the imports following it to not be executed.
 import py7zr     # pylint: disable=import-error,useless-suppression  # pyright: ignore [reportMissingImports]
-import py7zr.io  # pylint: disable=import-error,useless-suppression  # pyright: ignore [reportMissingImports]      # cover-req-lt3.14
-from .defs import FileType, UnzipWalkResult, FileProcessor, FileProcessorArgs, RecursiveOpener, RecursiveOpenArgs  # cover-req-lt3.14
+import py7zr.io  # pylint: disable=import-error,useless-suppression  # pyright: ignore [reportMissingImports]
+from .defs import FileType, UnzipWalkResult, FileProcessor, FileProcessorArgs, RecursiveOpener, RecursiveOpenArgs
 
 # spell-checker: ignore getbuffer nbytes
 
-class Py7zBytesIO(py7zr.io.Py7zIO):  # pyright: ignore [reportUntypedBaseClass]  # cover-req-lt3.14
+class Py7zBytesIO(py7zr.io.Py7zIO):  # pyright: ignore [reportUntypedBaseClass]
     def __init__(self, buffer :BytesIO):
         self._buffer = buffer
     def write(self, s :Union[bytes, bytearray]) -> int:
@@ -47,7 +47,7 @@ class Py7zBytesIO(py7zr.io.Py7zIO):  # pyright: ignore [reportUntypedBaseClass] 
     def size(self) -> int:
         return self._buffer.getbuffer().nbytes
 
-class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUntypedBaseClass]  # cover-req-lt3.14
+class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUntypedBaseClass]
     def __init__(self):
         self._filename :Optional[str] = None
         self._buffer :Optional[BytesIO] = None
@@ -64,7 +64,7 @@ class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUn
             raise FileNotFoundError
         return self._filename, self._buffer
 
-class Wrap7Z:  # cover-req-lt3.14
+class Wrap7Z:
 
     @staticmethod
     def _read_one(sz :py7zr.SevenZipFile, fn :str) -> BytesIO:
