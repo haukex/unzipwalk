@@ -315,9 +315,9 @@ options:
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future
 versions. For more control, use the library instead of this command-line tool.
-** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, ripemd160, sha1,
-sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
-sha512_224, sha512_256, shake_128, shake_256, sm3
+** Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, mdc2,
+ripemd160, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384,
+sha3_512, sha512, sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.
@@ -325,7 +325,7 @@ Run the command with `--help` to see the list of algorithms available on your sy
 
 ## Author, Copyright, and License
 
-Copyright (c) 2022-2025 Hauke Dämpfling ([haukex@zero-g.net](mailto:haukex@zero-g.net))
+Copyright (c) 2022-2026 Hauke Dämpfling ([haukex@zero-g.net](mailto:haukex@zero-g.net))
 at the Leibniz Institute of Freshwater Ecology and Inland Fisheries (IGB),
 Berlin, Germany, [https://www.igb-berlin.de/](https://www.igb-berlin.de/)
 

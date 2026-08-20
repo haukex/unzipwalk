@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euxo pipefail
 
+# This file is based on https://github.com/haukex/my-py-template/blob/main/dev/isolated-dist-test.sh
+
 ##### Test distribution in an isolated environment
 # This test takes a built .tar.gz distribution (must be passed as first argument)
 # and runs the test suite on it in an isolated venv.

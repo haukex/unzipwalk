@@ -1,3 +1,5 @@
+# This file is based on https://github.com/haukex/my-py-template/blob/main/pyproject.toml
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
@@ -55,12 +57,13 @@ unzipwalk = "unzipwalk.__main__:main"
 # mypy:     ``# type: ignore[setting-name]``
 # coverage: ``# pragma: no cover``, ``# pragma: no branch``, and https://pypi.org/project/coverage-simple-excludes/
 
-# spell-checker: ignore setuptools pylint noqa mypy venv rcfile pyproject inlinevar overgeneral argparse booleaness
+# spell-checker: ignore setuptools pylint noqa mypy rcfile pyproject inlinevar overgeneral argparse booleaness
 
 # ##### ##### ##### ##### ##### https://github.com/microsoft/pyright/blob/main/docs/configuration.md ##### ##### ##### ##### #####
 
 [tool.pyright]
 typeCheckingMode = "strict"
+# for stricter type checking, comment out all of these (except reportUnnecessaryTypeIgnoreComment):
 reportMissingTypeStubs = "none"
 reportUnknownMemberType = "none"
 reportUnknownArgumentType = "none"
@@ -127,7 +130,10 @@ max-line-length = 150
 enable_error_code = [ "ignore-without-code" ]
 ignore_missing_imports = true
 check_untyped_defs = true
-#disallow_incomplete_defs = true  # This would require a lot of `-> None` and such
+# for stricter type checking, uncomment these three:
+# disallow_incomplete_defs = true  # These would require a lot of `-> None` and such, but have
+# disallow_untyped_defs = true     # the advantage of giving mypy more knowledge of types
+# disallow_any_generics = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_return_any = true

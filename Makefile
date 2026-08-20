@@ -1,6 +1,8 @@
 ## To get help on this makefile, run `make help`.
 # https://www.gnu.org/software/make/manual/make.html
 
+# This file is based on https://github.com/haukex/my-py-template/blob/main/Makefile
+
 # Adapt these variables for this project:
 py_code_locs = unzipwalk tests docs/*.py docs/_ext/*.py
 # Hint: $(filter-out whatever,$(py_code_locs))
@@ -12,12 +14,12 @@ perm_checks = ./* .gitignore .vscode .github
 PYTHON3BIN = python
 
 .PHONY: help tasklist installdeps test build-check outdated
-.PHONY: smoke-checks nix-checks shellcheck ver-checks coverage unittest
+.PHONY: smoke-checks nix-checks shellcheck ver-checks coverage unittest clean
 test:   smoke-checks nix-checks shellcheck ver-checks coverage  ## Run all tests
 # Reminder: If the `test` target changes, make the appropriate changes to .github/workflows/tests.yml
 
 # spell-checker: ignore txts tasklist installdeps shellcheck FSTYPE MJSON OSTYPE devpod euxo pythonpath rcfile sdist
-# spell-checker: ignore igbpyutils ipynb msys mypy noheadings notruncate pipefail pycache pylint pyproject venv vfat
+# spell-checker: ignore igbpyutils ipynb msys mypy noheadings notruncate pipefail pycache pylint pyproject vfat
 
 SHELL = /bin/bash
 .ONESHELL:  # each recipe is executed as a single script
@@ -27,6 +29,10 @@ README.md: docs/requirements.txt docs/conf.py docs/index.rst unzipwalk/__init__.
 	make -C docs output/markdown/index.md
 	cp docs/output/markdown/index.md README.md
 	make -C docs clean
+
+clean:
+	@set -uxo pipefail
+	git clean -dxf -e '.venv*'
 
 build-check: smoke-checks
 	@set -euxo pipefail
@@ -67,8 +73,8 @@ smoke-checks:  ## Basic smoke tests
 nix-checks:  ## Checks that depend on a *NIX OS/FS
 	@set -euo pipefail
 	unreliable_perms="yes"
-	if [ "$$OSTYPE" == "msys" ]; then  # e.g. Git bash on Windows
-		echo "- Assuming unreliable permission bits because Windows"
+	if [[ "$$OSTYPE" =~ ^(msys|cygwin)$$ ]]; then  # e.g. Git bash on Windows
+		echo "- Assuming unreliable permission bits because OSTYPE=$$OSTYPE"
 		set -x
 	else
 		fstype="$$( findmnt --all --first --noheadings --list --output FSTYPE --notruncate --target . )"

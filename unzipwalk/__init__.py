@@ -97,7 +97,7 @@ Run the command with ``--help`` to see the list of algorithms available on your 
 Author, Copyright, and License
 ------------------------------
 
-Copyright (c) 2022-2025 Hauke Dämpfling (haukex@zero-g.net)
+Copyright (c) 2022-2026 Hauke Dämpfling (haukex@zero-g.net)
 at the Leibniz Institute of Freshwater Ecology and Inland Fisheries (IGB),
 Berlin, Germany, https://www.igb-berlin.de/
 
