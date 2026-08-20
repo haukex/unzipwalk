@@ -187,7 +187,7 @@ def _inner_recur_open(a: RecursiveOpenArgs) -> Generator[IO[bytes], None, None]:
                 with _inner_recur_open(RecursiveOpenArgs(fns=a.fns[1:], fh=cast(IO[bytes], fh2))) as inner:
                     yield inner
         else:
-            assert False, 'should be unreachable: not all file types covered?'  # pragma: no cover
+            raise ValueError('invalid filename given to recursive_open')
     except GeneratorExit:  # https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/contextmanager-generator-missing-cleanup.html
         pass  # pragma: no cover
 

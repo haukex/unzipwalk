@@ -1,6 +1,12 @@
 Changelog for unzipwalk
 =======================
 
+1.9.0 - *not yet released*
+------------------------
+
+- `recursive_open` now handles invalid arguments better
+- `py7zr` now supports Python 3.14, so test that combination
+
 1.8.1 - Sun, Nov 16 2025
 ------------------------
 

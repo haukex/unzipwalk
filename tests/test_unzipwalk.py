@@ -156,6 +156,10 @@ class TestUnzipWalk(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 with uut.recursive_open(("opt.7z", "bang")):
                     pass  # pragma: no cover
+            # bad filename
+            with self.assertRaises(ValueError):
+                with uut.recursive_open(("test.csv", "blammo")):
+                    pass  # pragma: no cover
 
     def test_result_validate(self):
         with self.assertRaises(ValueError):
