@@ -289,6 +289,10 @@ Close the file.
 
 #### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0, /) → [int](https://docs.python.org/3/library/functions.html#int)
 
+### unzipwalk.ARCHIVE_RE *= re.compile('\\\\.(?:tar(?:\\\\.gz|\\\\.bz2|\\\\.xz)?|tgz|txz|tbz2?|zip|7z|bz2|xz|gz)\\\\Z', re.IGNORECASE)*
+
+A regular expression that can be used to search against filenames which this module supports.
+
 ## Command-Line Interface
 
 ```default

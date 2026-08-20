@@ -86,6 +86,8 @@ API
     :members:
     :undoc-members:
 
+.. autodata:: unzipwalk.ARCHIVE_RE
+
 Command-Line Interface
 ----------------------
 
@@ -140,6 +142,9 @@ except (ImportError, OSError):  # pragma: no cover  # tests check this case by m
     W7Z = None  # pylint: disable=invalid-name,useless-suppression  # pyright: ignore [reportConstantRedefinition]
 
 _TARFILE_RE = re.compile(r'\.(?:tar(?:\.gz|\.bz2|\.xz)?|tgz|txz|tbz2?)\Z', re.I)
+
+#: A regular expression that can be used to search against filenames which this module supports.
+ARCHIVE_RE = re.compile(r'\.(?:tar(?:\.gz|\.bz2|\.xz)?|tgz|txz|tbz2?|zip|7z|bz2|xz|gz)\Z', re.I)
 
 @contextmanager
 def _inner_recur_open(a: RecursiveOpenArgs) -> Generator[IO[bytes], None, None]:

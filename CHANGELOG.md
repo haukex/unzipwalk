@@ -4,8 +4,9 @@ Changelog for unzipwalk
 1.9.0 - *not yet released*
 ------------------------
 
+- Added `unzipwalk.ARCHIVE_RE`
 - `recursive_open` now handles invalid arguments better
-- `py7zr` now supports Python 3.14, so test that combination
+- `py7zr` now supports Python 3.14, so that combination is now tested
 
 1.8.1 - Sun, Nov 16 2025
 ------------------------

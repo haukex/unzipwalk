@@ -37,7 +37,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from py7zr.exceptions import ArchiveError
 import unzipwalk as uut
 from unzipwalk import FileType
-from .defs import EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
+from .defs import EXPECT, EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
 
 def load_tests(_loader, tests, _ignore):
     globs :dict = {}
@@ -330,3 +330,10 @@ class TestUnzipWalk(unittest.TestCase):
         fact = SingleBytesIOFactory()
         with self.assertRaises(TypeError):
             fact.create(123)  # type: ignore[arg-type]
+
+    def test_archive_re(self):
+        for f in EXPECT + EXPECT_7Z:
+            if f.typ == FileType.ARCHIVE:
+                self.assertRegex(f.fns[-1].name, uut.ARCHIVE_RE)
+            else:
+                self.assertNotRegex(f.fns[-1].name, uut.ARCHIVE_RE)
