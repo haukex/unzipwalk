@@ -1,7 +1,7 @@
 Changelog for unzipwalk
 =======================
 
-1.9.0 - *not yet released*
+1.9.0 - Thu, Aug 20 2026
 ------------------------
 
 - Added `unzipwalk.ARCHIVE_RE`

@@ -287,6 +287,12 @@ Close the file.
 
 #### seekable() → [bool](https://docs.python.org/3/library/functions.html#bool)
 
+See [`io.IOBase.seekable()`](https://docs.python.org/3/library/io.html#io.IOBase.seekable).
+
+#### WARNING
+Some underlying classes may return True even in cases where [`seek()`](#unzipwalk.ReadOnlyBinary.seek) will fail!
+(e.g. GH [python/cpython#77354](https://github.com/python/cpython/issues/77354))
+
 #### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0, /) → [int](https://docs.python.org/3/library/functions.html#int)
 
 ### unzipwalk.ARCHIVE_RE *= re.compile('\\\\.(?:tar(?:\\\\.gz|\\\\.bz2|\\\\.xz)?|tgz|txz|tbz2?|zip|7z|bz2|xz|gz)\\\\Z', re.IGNORECASE)*
@@ -319,9 +325,9 @@ options:
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future
 versions. For more control, use the library instead of this command-line tool.
-** Possible values for ALGO: blake2b, blake2s, md4, md5, md5-sha1, mdc2,
-ripemd160, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384,
-sha3_512, sha512, sha512_224, sha512_256, shake_128, shake_256, sm3, whirlpool
+** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, ripemd160, sha1,
+sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
+sha512_224, sha512_256, shake_128, shake_256, sm3
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.
