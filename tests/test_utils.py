@@ -27,10 +27,10 @@ import unzipwalk.utils as uut
 
 class TestUtils(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.maxDiff = None  # pylint: disable=invalid-name
 
-    def test_decode_tuple(self):
+    def test_decode_tuple(self) -> None:
         self.assertEqual( uut.decode_tuple(repr(('hi',))), ('hi',) )
         self.assertEqual( uut.decode_tuple(repr(('hi','there'))), ('hi','there') )
         self.assertEqual( uut.decode_tuple('( "foo" , \'bar\' ) '), ('foo','bar') )

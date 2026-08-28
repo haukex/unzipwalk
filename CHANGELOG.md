@@ -1,6 +1,11 @@
 Changelog for unzipwalk
 =======================
 
+1.9.1 - Fri, Aug 28 2026
+------------------------
+
+- Added more type annotations and added `py.typed` marker
+
 1.9.0 - Thu, Aug 20 2026
 ------------------------
 

@@ -48,7 +48,7 @@ class Py7zBytesIO(py7zr.io.Py7zIO):  # pyright: ignore [reportUntypedBaseClass]
         return self._buffer.getbuffer().nbytes
 
 class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUntypedBaseClass]
-    def __init__(self):
+    def __init__(self) -> None:
         self._filename :Optional[str] = None
         self._buffer :Optional[BytesIO] = None
     def create(self, filename :str) -> py7zr.io.Py7zIO:

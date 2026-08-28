@@ -27,6 +27,7 @@ import sys
 import shutil
 from copy import deepcopy
 from contextlib import contextmanager
+from collections.abc import Generator
 from tempfile import TemporaryDirectory
 from typing import Optional, NamedTuple
 from pathlib import PurePath, Path, PurePosixPath
@@ -119,7 +120,7 @@ EXPECT_7Z :tuple[ExpectedResult, ...] = (
 )
 
 @contextmanager
-def TestCaseContext():  # pylint: disable=invalid-name
+def TestCaseContext() -> Generator[list[ExpectedResult], None, None]:  # pylint: disable=invalid-name
     with TemporaryDirectory() as td:
         testdir = Path(td)/'zips'
         # copy to a local temporary directory because this allows the use of symlinks when testing via WSL

@@ -32,7 +32,7 @@ from igbpyutils.file import open_out
 import igbpyutils.error
 from . import unzipwalk, FileType
 
-def _arg_parser():
+def _arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser('unzipwalk', description='Recursively walk into directories and archives',
         epilog="* Note --exclude currently only matches against the final name in the sequence, excluding path names, "
         "but this interface may change in future versions. For more control, use the library instead of this command-line tool.\n\n"
@@ -47,7 +47,7 @@ def _arg_parser():
     parser.add_argument('paths', metavar='PATH', help='paths to process (default is current directory)', nargs='*')
     return parser
 
-def main(argv=None):
+def main(argv :Sequence[str]|None = None) -> None:
     igbpyutils.error.init_handlers()
     parser = _arg_parser()
     args = parser.parse_args(argv)

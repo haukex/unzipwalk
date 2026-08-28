@@ -197,7 +197,7 @@ def _inner_recur_open(a: RecursiveOpenArgs) -> Generator[IO[bytes], None, None]:
         pass  # pragma: no cover
 
 @contextmanager
-def recursive_open(fns :Sequence[Filename], encoding=None, errors=None, newline=None) \
+def recursive_open(fns :Sequence[Filename], encoding :Optional[str] = None, errors :Optional[str] = None, newline :Optional[str] = None) \
         -> Generator[Union[ReadOnlyBinary, io.TextIOWrapper], None, None]:
     # note Sphinx's "WARNING: py:class reference target not found: _io.TextIOWrapper" can be ignored
     """This context manager allows opening files nested inside archives directly.
@@ -368,7 +368,7 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
         respectively) may not be raised until the file is actually read, so you'll probably also want to add an
         exception handler around your ``read()`` call!
     """
-    def handle(p :Path):
+    def handle(p :Path) -> Generator[UnzipWalkResult, None, None]:
         try:
             if matcher is not None and not matcher((p,)):
                 yield UnzipWalkResult(names=(p,), typ=FileType.SKIP).validate()

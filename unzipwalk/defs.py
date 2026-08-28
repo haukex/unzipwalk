@@ -97,7 +97,7 @@ class UnzipWalkResult(NamedTuple):
     #: file, if the compression format and library support knowing the compressed file's size in advance. Otherwise, this is :obj:`None`.
     size :Optional[int] = None
 
-    def validate(self):
+    def validate(self) -> 'UnzipWalkResult':
         """Validate whether the object's fields are set properly and throw errors if not.
 
         Intended for internal use, mainly when type checkers are not being used.

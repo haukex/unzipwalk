@@ -1,7 +1,7 @@
 # This file is based on https://github.com/haukex/my-py-template/blob/main/pyproject.toml
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -63,19 +63,10 @@ unzipwalk = "unzipwalk.__main__:main"
 
 [tool.pyright]
 typeCheckingMode = "strict"
-# for stricter type checking, comment out all of these (except reportUnnecessaryTypeIgnoreComment):
-reportMissingTypeStubs = "none"
-reportUnknownMemberType = "none"
-reportUnknownArgumentType = "none"
-reportUnknownVariableType = "none"
-reportUnknownParameterType = "none"
-reportUnknownLambdaType = "none"
-reportMissingParameterType = "none"
-reportMissingTypeArgument = "none"
-reportGeneralTypeIssues = "none"  # too bad there isn't more fine-grained control than this
-reportUnnecessaryTypeIgnoreComment = "none"  # this flags too many comments; we use mypy's `warn_unused_ignores` instead
 reportImportCycles = "error"
 reportPropertyTypeMismatch = "warning"
+# The following can flag too many comments; note mypy's `warn_unused_ignores` is also enabled and that can be used instead
+# reportUnnecessaryTypeIgnoreComment = "none"
 
 # ##### ##### ##### ##### ##### https://coverage.readthedocs.io/en/latest/config.html ##### ##### ##### ##### #####
 
@@ -130,10 +121,9 @@ max-line-length = 150
 enable_error_code = [ "ignore-without-code" ]
 ignore_missing_imports = true
 check_untyped_defs = true
-# for stricter type checking, uncomment these three:
-# disallow_incomplete_defs = true  # These would require a lot of `-> None` and such, but have
-# disallow_untyped_defs = true     # the advantage of giving mypy more knowledge of types
-# disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_return_any = true

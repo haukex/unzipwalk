@@ -42,7 +42,7 @@ from .defs import BAD_ZIPS, TestCaseContext, ExpectedResult
 
 class TestUnzipWalkCli(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.maxDiff = None  # pylint: disable=invalid-name
 
     def _run_cli(self, argv :list[str]) -> list[str]:
@@ -59,7 +59,7 @@ class TestUnzipWalkCli(unittest.TestCase):
         lines.sort()
         return lines
 
-    def test_cli(self):
+    def test_cli(self) -> None:
         expect :list[ExpectedResult]
         with TestCaseContext() as expect:
             exp_basic = sorted( f"FILE {tuple(str(n) for n in e.fns)!r}" for e in expect if e.typ==FileType.FILE )
@@ -87,7 +87,7 @@ class TestUnzipWalkCli(unittest.TestCase):
                 f"FILE {tuple(str(n) for n in e.fns)!r}" for e in expect if e.typ==FileType.FILE
                 and not ( e.fns[-1].name.startswith('world.') or len(e.fns)>1 and e.fns[1].name=='abc.zip' ) ) )
 
-    def test_cli_errors(self):
+    def test_cli_errors(self) -> None:
         os.chdir(BAD_ZIPS)
         self.assertEqual( self._run_cli(['-d','.','does_not_exist']), sorted( [
             "ERROR ('does_not_exist',)",

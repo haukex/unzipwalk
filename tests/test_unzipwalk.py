@@ -39,12 +39,12 @@ import unzipwalk as uut
 from unzipwalk import FileType
 from .defs import EXPECT, EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
 
-def load_tests(_loader, tests, _ignore):
-    globs :dict = {}
-    def doctest_setup(_t :doctest.DocTest):
+def load_tests(_loader :unittest.TestLoader, tests :unittest.TestSuite, _ignore :str|None) -> unittest.TestSuite:
+    globs :dict[str, str] = {}
+    def doctest_setup(_t :doctest.DocTest) -> None:
         globs['_prev_dir'] = os.getcwd()
         os.chdir( Path(__file__).parent/'doctest_wd' )
-    def doctest_teardown(_t :doctest.DocTest):
+    def doctest_teardown(_t :doctest.DocTest) -> None:
         os.chdir( globs['_prev_dir'] )
         del globs['_prev_dir']
     tests.addTests(doctest.DocTestSuite(uut, setUp=doctest_setup, tearDown=doctest_teardown, globs=globs))
@@ -52,10 +52,10 @@ def load_tests(_loader, tests, _ignore):
 
 class TestUnzipWalk(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.maxDiff = None  # pylint: disable=invalid-name
 
-    def test_unzipwalk(self):
+    def test_unzipwalk(self) -> None:
         with TestCaseContext() as expect:
             self.assertEqual( expect, sorted( map(r2e, uut.unzipwalk(os.curdir) ) ) )
             # and again, definitely without 7z
@@ -70,11 +70,11 @@ class TestUnzipWalk(unittest.TestCase):
             finally:
                 uut.W7Z = prev
 
-    def test_unzipwalk_errs(self):
+    def test_unzipwalk_errs(self) -> None:
         with self.assertRaises(FileNotFoundError):
             list(uut.unzipwalk('/this_file_should_not_exist'))
 
-    def test_unzipwalk_matcher(self):
+    def test_unzipwalk_matcher(self) -> None:
         with TestCaseContext() as expect:
             # filter from the initial path list
             self.assertEqual( sorted(
@@ -118,7 +118,7 @@ class TestUnzipWalk(unittest.TestCase):
                         ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: not ( len(p)>1 and p[1].parts[0] == 'thing' ) ) ) ) )
 
-    def test_recursive_open(self):
+    def test_recursive_open(self) -> None:
         with TestCaseContext() as expect:
             for file in expect:
                 if file.typ == FileType.FILE:
@@ -161,7 +161,7 @@ class TestUnzipWalk(unittest.TestCase):
                 with uut.recursive_open(("test.csv", "blammo")):
                     pass  # pragma: no cover
 
-    def test_result_validate(self):
+    def test_result_validate(self) -> None:
         with self.assertRaises(ValueError):
             uut.UnzipWalkResult((), FileType.OTHER, None, None).validate()
         with self.assertRaises(TypeError):
@@ -177,7 +177,7 @@ class TestUnzipWalk(unittest.TestCase):
         with self.assertRaises(TypeError):
             uut.UnzipWalkResult((Path(),), FileType.OTHER, None, 42).validate()
 
-    def test_checksum_lines(self):
+    def test_checksum_lines(self) -> None:
         res = uut.UnzipWalkResult(names=(PurePosixPath('hello'),), typ=FileType.DIR)
         ln = res.checksum_line("md5")
         self.assertEqual( ln, "# DIR hello" )
@@ -223,7 +223,7 @@ class TestUnzipWalk(unittest.TestCase):
         with self.assertRaises(ValueError):
             uut.UnzipWalkResult.from_checksum_line("e80b5017098950fc58aad83c8c14978e *(kaboom")
 
-    def test_errors(self):
+    def test_errors(self) -> None:
         with self.assertRaises(BadZipFile):
             list(uut.unzipwalk(BAD_ZIPS/'not_a.zip'))
         with self.assertRaises(TarError):
@@ -310,7 +310,7 @@ class TestUnzipWalk(unittest.TestCase):
                 pass  # pragma: no cover
 
     @unittest.skipIf(condition=not sys.platform.startswith('linux'), reason='only on Linux')
-    def test_errors_linux(self):  # cover-only-linux
+    def test_errors_linux(self) -> None:  # cover-only-linux
         with TemporaryDirectory() as td:
             f = Path(td)/'foo'
             f.touch()
@@ -321,7 +321,7 @@ class TestUnzipWalk(unittest.TestCase):
                 sorted( map(r2e, uut.unzipwalk(td, raise_errors=False) ) ),
                 sorted( [ ExpectedResult( (f,), None, FileType.ERROR, None ), ] ) )
 
-    def test_wrap7z(self):
+    def test_wrap7z(self) -> None:
         from unzipwalk.wrap7z import Py7zBytesIO, SingleBytesIOFactory  # pylint: disable=import-outside-toplevel
         pio = Py7zBytesIO(io.BytesIO(b'abc'))
         self.assertEqual(pio.size(), 3)
@@ -331,7 +331,7 @@ class TestUnzipWalk(unittest.TestCase):
         with self.assertRaises(TypeError):
             fact.create(123)  # type: ignore[arg-type]
 
-    def test_archive_re(self):
+    def test_archive_re(self) -> None:
         for f in EXPECT + EXPECT_7Z:
             if f.typ == FileType.ARCHIVE:
                 self.assertRegex(f.fns[-1].name, uut.ARCHIVE_RE)
