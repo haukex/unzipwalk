@@ -132,7 +132,7 @@ def TestCaseContext() -> Generator[list[ExpectedResult], None, None]:  # pylint:
             else:  # cover-not-win32
                 (testdir/'baz.zip').symlink_to('more.zip')
                 expect.append( ExpectedResult( (Path("baz.zip"),), None, FileType.SYMLINK, None ) )
-                os.mkfifo(testdir/'xy.fifo')  # pyright: ignore [reportAttributeAccessIssue]  # pylint: disable=no-member,useless-suppression
+                os.mkfifo(testdir/'xy.fifo')  # pyright: ignore [reportAttributeAccessIssue,reportUnknownMemberType]  # pylint: disable=no-member,useless-suppression  # noqa: E501
                 expect.append( ExpectedResult( (Path("xy.fifo"),), None, FileType.OTHER, None ) )
             expect.sort()
             yield expect
