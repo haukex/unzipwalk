@@ -25,6 +25,7 @@ along with this program. If not, see https://www.gnu.org/licenses/
 import os
 import io
 import sys
+import errno
 import doctest
 import unittest
 from hashlib import sha1
@@ -32,12 +33,15 @@ from lzma import LZMAError
 from gzip import BadGzipFile
 from tarfile import TarError
 from zipfile import BadZipFile
+from unittest.mock import patch
 from tempfile import TemporaryDirectory
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from py7zr.exceptions import ArchiveError
 import unzipwalk as uut
 from unzipwalk import FileType
 from .defs import EXPECT, EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
+
+# spell: ignore strerror
 
 def load_tests(_loader :unittest.TestLoader, tests :unittest.TestSuite, _ignore :str|None) -> unittest.TestSuite:
     globs :dict[str, str] = {}
@@ -339,6 +343,48 @@ class TestUnzipWalk(unittest.TestCase):
             self.assertEqual(
                 r2e(uut.unzipwalk(td, raise_errors=False)),
                 sorted( [ ExpectedResult( (f,), None, FileType.ERROR, None ), ] ) )
+
+    def test_dir_walk_errors(self) -> None:
+        with TemporaryDirectory() as td:
+            error = PermissionError(errno.EACCES, os.strerror(errno.EACCES), td)
+            with patch('unzipwalk.os.scandir', side_effect=error):
+                with self.assertRaises(PermissionError) as caught:
+                    list(uut.unzipwalk(td))
+                self.assertIs(caught.exception, error)
+                self.assertEqual(r2e(uut.unzipwalk(td, raise_errors=False)),
+                    [ExpectedResult((Path(td),), None, FileType.ERROR, None)])
+
+    @unittest.skipIf(condition = os.name!='posix', reason='only on POSIX')
+    def test_dir_perms(self) -> None:  # cover-only-posix
+        with TemporaryDirectory() as temp_dir:
+            td = Path(temp_dir)
+            blocked = td/'blocked'
+            blocked.mkdir()
+            (blocked/'hidden.txt').write_bytes(b'hidden')
+            (td/'readable').mkdir()
+            (td/'readable'/'good.txt').write_bytes(b'good')
+            blocked.chmod(0)
+            try:
+                for path in (td, blocked):
+                    with self.subTest(path=path):
+                        with self.assertRaises(PermissionError) as caught:
+                            list(uut.unzipwalk(path))
+                        self.assertEqual(caught.exception.filename, str(blocked))
+                self.assertEqual( r2e(uut.unzipwalk(td, raise_errors=False)),
+                    sorted([ExpectedResult((blocked,), None, FileType.ERROR, None),
+                            ExpectedResult((td/'readable',), None, FileType.DIR, None),
+                            ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )
+                self.assertEqual( r2e(uut.unzipwalk(blocked, raise_errors=False)),
+                    [ExpectedResult((blocked,), None, FileType.ERROR, None)] )
+                self.assertEqual( r2e(uut.unzipwalk((blocked, td/'readable'), raise_errors=False)),
+                    sorted([ExpectedResult((blocked,), None, FileType.ERROR, None),
+                            ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )
+                self.assertEqual( r2e(uut.unzipwalk(td, matcher=lambda p: p[-1].name != 'blocked')),
+                    sorted([ExpectedResult((blocked,), None, FileType.SKIP, None),
+                            ExpectedResult((td/'readable',), None, FileType.DIR, None),
+                            ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )
+            finally:
+                blocked.chmod(0o700)
 
     def test_wrap7z(self) -> None:
         from unzipwalk.wrap7z import Py7zBytesIO, SingleBytesIOFactory  # pylint: disable=import-outside-toplevel

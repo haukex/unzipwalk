@@ -8,6 +8,8 @@ Changelog for unzipwalk
   in the input files, it is skipped automatically.
 - Fixed physical directory exclusions in `matcher` and CLI `--exclude`: excluded directories are
   no longer descended into, including directories passed as input paths.
+- Directory traversal errors now respect `raise_errors`: they are raised by default, or when
+  `raise_errors=False`, they are reported as `ERROR` results and traversal continues.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------

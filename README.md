@@ -95,7 +95,7 @@ This generator recursively walks into directories and compressed files and yield
     it will not be descended into, so you won’t have to exclude the files inside (though it’s good practice
     to write your matcher to exclude them anyway - see for example [`is_relative_to()`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.is_relative_to)).
   * **raise_errors** – When this is turned on (the default), any errors are raised immediately,
-    aborting the iteration. If this is turned off, when decompression errors occur, a
+    aborting the iteration. If this is turned off, when file access, directory traversal, or decompression errors occur, a
     [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.ERROR`](#unzipwalk.FileType) is yielded for those files instead.
 
 #### NOTE

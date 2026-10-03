@@ -335,7 +335,8 @@ def _proc_file(a :FileProcessorArgs) -> Generator[UnzipWalkResult, None, None]: 
         assert a.fh.readable(), a.fh  # expected by ReadOnlyBinary
         yield UnzipWalkResult(names=a.fns, typ=FileType.FILE, hnd=a.fh, size=a.size)
 
-def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_errors :bool = True) -> Generator[UnzipWalkResult, None, None]:
+def unzipwalk(paths :AnyPaths,  # pylint: disable=too-many-locals
+        *, matcher :Optional[FilterType] = None, raise_errors :bool = True) -> Generator[UnzipWalkResult, None, None]:
     """This generator recursively walks into directories and compressed files and yields named tuples of type :class:`UnzipWalkResult`.
 
     :param paths: A filename or iterable of filenames.
@@ -350,9 +351,9 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
         it will not be descended into, so you won't have to exclude the files inside (though it's good practice
         to write your matcher to exclude them anyway - see for example :meth:`~pathlib.PurePath.is_relative_to`).
 
-    :param raise_errors: When this is turned on (the default), any errors are raised immediately,
-        aborting the iteration. If this is turned off, when decompression errors occur, a
-        :class:`UnzipWalkResult` of type :class:`FileType.ERROR<FileType>` is yielded for those files instead.
+    :param raise_errors: When this is turned on (the default), any errors are raised immediately, aborting the
+        iteration. If this is turned off, when file access, directory traversal, or decompression errors occur,
+        a :class:`UnzipWalkResult` of type :class:`FileType.ERROR<FileType>` is yielded for those files instead.
 
     .. note:: If :mod:`py7zr` is not installed, those archives will not be descended into.
 
@@ -388,6 +389,15 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=(p,), typ=FileType.ERROR).validate()
+    walk_errors :list[OSError] = []
+    def walk_error(ex :OSError) -> None:
+        if raise_errors:
+            raise ex
+        walk_errors.append(ex)
+    def report_walk_errors(path :Path) -> Generator[UnzipWalkResult, None, None]:
+        for ex in walk_errors:
+            yield UnzipWalkResult(names=(Path(ex.filename or path),), typ=FileType.ERROR).validate()
+        walk_errors.clear()
     for p in to_Paths(paths):
         try:
             is_dir = p.resolve(strict=True).is_dir()
@@ -400,14 +410,21 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
             yield UnzipWalkResult(names=(p,), typ=FileType.ERROR).validate()
         else:
             if is_dir:
-                for root, dirs, files in os.walk(p):
+                for root, dirs, files in os.walk(p, onerror=walk_error):
+                    r = Path(root)
+                    yield from report_walk_errors(p)
+                    # Report nested directories only after their entries have been read successfully.
+                    if r != p:
+                        yield UnzipWalkResult(names=(r,), typ=FileType.DIR).validate()
                     for dn in dirs.copy():
-                        for result in handle(Path(root)/dn):
+                        for result in handle(r/dn):
                             # "walk will only recurse into the subdirectories whose names remain in dirnames"
                             if result.typ != FileType.DIR:
                                 dirs.remove(dn)
-                            yield result
+                                yield result
                     for fn in files:
-                        yield from handle(Path(root)/fn)
+                        yield from handle(r/fn)
+                # An error at the end of the walk may not be followed by another directory result.
+                yield from report_walk_errors(p)
             else:
                 yield from handle(p)
