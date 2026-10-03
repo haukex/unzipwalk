@@ -119,6 +119,24 @@ class TestUnzipWalk(unittest.TestCase):
                         ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: not ( len(p)>1 and p[1].parts[0] == 'thing' ) ) ) ) )
 
+    def test_skip_dirs(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            td = Path(tmp_dir)
+            for d in (td/'excl', td/'inc'/'excl'):
+                d.mkdir(parents=True)
+                (d/'kaboom.zip').write_bytes(b'I am not a zip file, reading me would cause an error')
+            (td/'inc'/'good.txt').write_bytes(b'good')
+            self.assertEqual(
+                sorted(map(r2e, uut.unzipwalk(td, matcher=lambda p: p[-1].name != 'excl'))),
+                sorted([
+                    ExpectedResult((td/'excl',), None, FileType.SKIP, None),
+                    ExpectedResult((td/'inc',), None, FileType.DIR, None),
+                    ExpectedResult((td/'inc'/'excl',), None, FileType.SKIP, None),
+                    ExpectedResult((td/'inc'/'good.txt',), b'good', FileType.FILE, 4) ]) )
+            self.assertEqual(
+                list( uut.unzipwalk(td/'excl', matcher=lambda p: p[-1].name != 'excl') ),
+                [ uut.UnzipWalkResult(names=(td/'excl',), typ=FileType.SKIP) ])
+
     def test_recursive_open(self) -> None:
         with TestCaseContext() as expect:
             for file in expect:

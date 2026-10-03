@@ -6,6 +6,8 @@ Changelog for unzipwalk
 
 - Improved CLI `--outfile` handling: It can no longer clobber existing files, and if the output is
   in the input files, it is skipped automatically.
+- Fixed physical directory exclusions in `matcher` and CLI `--exclude`: excluded directories are
+  no longer descended into, including directories passed as input paths.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------

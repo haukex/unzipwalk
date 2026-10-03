@@ -117,6 +117,7 @@ You should have received a copy of the GNU Lesser General Public License
 along with this program. If not, see https://www.gnu.org/licenses/
 """
 import io
+import os
 import re
 import stat
 from bz2 import BZ2File
@@ -390,13 +391,23 @@ def unzipwalk(paths :AnyPaths, *, matcher :Optional[FilterType] = None, raise_er
     for p in to_Paths(paths):
         try:
             is_dir = p.resolve(strict=True).is_dir()
+            if is_dir and matcher is not None and not matcher((p,)):
+                yield UnzipWalkResult(names=(p,), typ=FileType.SKIP).validate()
+                continue
         except Exception:
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=(p,), typ=FileType.ERROR).validate()
         else:
             if is_dir:
-                for pa in p.rglob('*'):
-                    yield from handle(pa)
+                for root, dirs, files in os.walk(p):
+                    for dn in dirs.copy():
+                        for result in handle(Path(root)/dn):
+                            # "walk will only recurse into the subdirectories whose names remain in dirnames"
+                            if result.typ != FileType.DIR:
+                                dirs.remove(dn)
+                            yield result
+                    for fn in files:
+                        yield from handle(Path(root)/fn)
             else:
                 yield from handle(p)

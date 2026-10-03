@@ -87,6 +87,9 @@ class TestUnzipWalkCli(unittest.TestCase):
             self.assertEqual( self._run_cli(['-e','world.*','--exclude=*abc*']), sorted(  # exclude
                 f"FILE {tuple(str(n) for n in e.fns)!r}" for e in expect if e.typ==FileType.FILE
                 and not ( e.fns[-1].name.startswith('world.') or len(e.fns)>1 and e.fns[1].name=='abc.zip' ) ) )
+            self.assertEqual(self._run_cli(['--all-files', '--exclude', 'subdir']), sorted(
+                [f"{e.typ.name} {tuple(str(n) for n in e.fns)!r}" for e in expect
+                    if not e.fns[0].is_relative_to(Path('subdir'))] + ["SKIP ('subdir',)"]))
 
     def test_cli_outfile(self) -> None:
         with TemporaryDirectory() as td, Pushd(td):
