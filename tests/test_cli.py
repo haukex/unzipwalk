@@ -30,15 +30,16 @@ import unittest
 from pathlib import Path
 from gzip import BadGzipFile
 from tarfile import TarError
-from zipfile import BadZipFile
 from unittest.mock import patch
+from zipfile import BadZipFile, ZipFile
 from tempfile import TemporaryDirectory
 from contextlib import redirect_stdout, redirect_stderr
+from igbpyutils.file import Pushd
 import unzipwalk.__main__ as uut
 from unzipwalk import FileType
 from .defs import BAD_ZIPS, TestCaseContext, ExpectedResult
 
-# spell-checker: ignore csha rcmd
+# spell-checker: ignore csha rcmd pushd
 
 class TestUnzipWalkCli(unittest.TestCase):
 
@@ -86,6 +87,32 @@ class TestUnzipWalkCli(unittest.TestCase):
             self.assertEqual( self._run_cli(['-e','world.*','--exclude=*abc*']), sorted(  # exclude
                 f"FILE {tuple(str(n) for n in e.fns)!r}" for e in expect if e.typ==FileType.FILE
                 and not ( e.fns[-1].name.startswith('world.') or len(e.fns)>1 and e.fns[1].name=='abc.zip' ) ) )
+
+    def test_cli_outfile(self) -> None:
+        with TemporaryDirectory() as td, Pushd(td):
+            Path('input.txt').write_bytes(b'physical')
+            with self.assertRaises(FileExistsError):
+                self._run_cli(['--outfile', 'input.txt', 'input.txt'])
+            self.assertEqual(Path('input.txt').read_bytes(), b'physical')
+            with ZipFile('archive.zip', 'w') as zf:
+                zf.writestr('output.txt', b'archived')
+            for options, expected in (
+                    (['--all-files'], [
+                        "FILE ('input.txt',)",
+                        "ARCHIVE ('archive.zip',)",
+                        "FILE ('archive.zip', 'output.txt')",
+                        "SKIP ('output.txt',)" ]),
+                    (['--all-files', '--checksum', 'sha256'], [
+                        f"{hashlib.sha256(b'physical').hexdigest()} *input.txt",
+                        '# ARCHIVE archive.zip',
+                        f"{hashlib.sha256(b'archived').hexdigest()} *('archive.zip', 'output.txt')",
+                        '# SKIP output.txt' ]) ):
+                with self.subTest(options=options):
+                    # The output path is absolute while traversal returns relative paths.
+                    self.assertEqual(self._run_cli([*options, '--outfile', str(Path(td)/'output.txt'), '.']), [])
+                    self.assertEqual(sorted(Path('output.txt').read_text(encoding='UTF-8').splitlines()), sorted(expected))
+                    Path('output.txt').unlink()
+            self.assertEqual(self._run_cli(['--outfile', '-', 'input.txt']), ["FILE ('input.txt',)"])
 
     def test_cli_errors(self) -> None:
         os.chdir(BAD_ZIPS)

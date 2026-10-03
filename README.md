@@ -320,7 +320,7 @@ options:
                         filename globs to exclude*
   -r, --raise-errors    raise errors instead of reporting them in output
   -o OUTFILE, --outfile OUTFILE
-                        output filename
+                        output filename (must not already exist)
 
 * Note --exclude currently only matches against the final name in the
 sequence, excluding path names, but this interface may change in future

@@ -43,7 +43,7 @@ def _arg_parser() -> argparse.ArgumentParser:
     group.add_argument('-c','--checksum', help="generate a checksum for each file**", choices=hashlib.algorithms_available, metavar="ALGO")
     parser.add_argument('-e', '--exclude', help="filename globs to exclude*", action="append", default=[])
     parser.add_argument('-r', '--raise-errors', help="raise errors instead of reporting them in output", action="store_true")
-    parser.add_argument('-o', '--outfile', help="output filename")
+    parser.add_argument('-o', '--outfile', help="output filename (must not already exist)")
     parser.add_argument('paths', metavar='PATH', help='paths to process (default is current directory)', nargs='*')
     return parser
 
@@ -51,10 +51,13 @@ def main(argv :Sequence[str]|None = None) -> None:
     igbpyutils.error.init_handlers()
     parser = _arg_parser()
     args = parser.parse_args(argv)
+    outfile = Path(args.outfile) if args.outfile and args.outfile != '-' else None
     def matcher(paths :Sequence[PurePath]) -> bool:
+        if outfile is not None and len(paths)==1 and Path(paths[0]).samefile(outfile):
+            return False  # skip the output file if we're using one
         return not any( fnmatch(paths[-1].name, pat) for pat in args.exclude )
     report = (FileType.FILE, FileType.ERROR)
-    with open_out(args.outfile) as fh:
+    with open_out(args.outfile, mode='x') as fh:
         for result in unzipwalk( args.paths if args.paths else Path(), matcher=matcher, raise_errors=args.raise_errors ):
             if args.checksum:
                 if result.typ in report or args.all_files:

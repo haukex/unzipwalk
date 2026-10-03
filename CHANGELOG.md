@@ -1,6 +1,12 @@
 Changelog for unzipwalk
 =======================
 
+1.9.3 - *not yet released*
+------------------------
+
+- Improved CLI `--outfile` handling: It can no longer clobber existing files, and if the output is
+  in the input files, it is skipped automatically.
+
 1.9.2 - Sat, Oct  3 2026
 ------------------------
 
