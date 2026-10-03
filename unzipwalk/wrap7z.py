@@ -70,6 +70,7 @@ class Wrap7Z:
     def _read_one(sz :py7zr.SevenZipFile, fn :str) -> BytesIO:
         """Read one file from a 7z archive as a BytesIO object."""
         fact = SingleBytesIOFactory()
+        sz.reset()
         sz.extract(targets=[str(fn)], factory=fact)
         try:
             return fact.get()[1]

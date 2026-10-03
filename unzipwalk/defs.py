@@ -75,7 +75,7 @@ class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
         .. warning:: Some underlying classes may return `True` even in cases where :meth:`seek` will fail!
             (e.g. GH `python/cpython#77354 <https://github.com/python/cpython/issues/77354>`_)
         """
-        ...  # pylint: disable=unnecessary-ellipsis
+        ...
     def seek(self, offset: int, whence: int = io.SEEK_SET, /) -> int: ...
 
 CHECKSUM_LINE_RE = re.compile(r'^([0-9a-f]+) \*(.+)$')

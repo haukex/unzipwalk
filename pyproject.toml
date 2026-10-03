@@ -7,13 +7,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "unzipwalk"
 description = "Recursively walk into directories and archives"
-version = "1.9.1"
+version = "1.9.2"
 authors = [ { name="Hauke D", email="haukex@zero-g.net" } ]
 # https://spdx.org/licenses/
 license = "LGPL-3.0-or-later"
 readme = "README.md"
 requires-python = ">=3.10"
-dynamic = ["dependencies"]
 # https://pypi.org/classifiers/
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -31,14 +30,37 @@ classifiers = [
     "Topic :: System :: Archiving",
 ]
 
-[tool.setuptools]
-packages = ["unzipwalk"]
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
-
+dependencies = [
+    "igbpyutils >= 1.0.2",
+]
+[dependency-groups]
+dev = [
+    "setuptools >= 77.0.0",
+    "igbpyutils == 1.0.2",
+    "simple-perms == 1.0.0 ; sys_platform != 'win32'",
+    "coverage[toml] == 7.16.2",
+    "coverage-simple-excludes == 1.1.1",
+    "pylint == 4.1.2",
+    "mypy == 2.4.0",
+    "pyright == 1.1.414",
+    "flake8 == 7.4.1",
+    "Flake8-pyproject == 1.2.4",
+    "build == 1.6.1 ; sys_platform == 'linux'",
+    "twine == 7.0.0 ; sys_platform == 'linux'",
+    # "pyinstaller == 6.22.3",
+    # for this project:
+    "py7zr == 1.1.3",
+    # for docs:
+    "tomli == 2.4.1",
+    "sphinx == 8.1.3",  # need older Sphinx for Python 3.10
+    "sphinx-markdown-builder == 0.6.11",
+    "types-docutils == 0.23.0.20260923",
+]
 [project.optional-dependencies]
 "7z" = ["py7zr>=1.1.3"]
+
+[tool.setuptools]
+packages = ["unzipwalk"]
 
 [project.scripts]
 unzipwalk = "unzipwalk.__main__:main"
@@ -57,7 +79,7 @@ unzipwalk = "unzipwalk.__main__:main"
 # mypy:     ``# type: ignore[setting-name]``
 # coverage: ``# pragma: no cover``, ``# pragma: no branch``, and https://pypi.org/project/coverage-simple-excludes/
 
-# spell-checker: ignore setuptools pylint noqa mypy rcfile pyproject inlinevar overgeneral argparse booleaness
+# spell-checker: ignore setuptools pylint noqa mypy rcfile pyproject inlinevar overgeneral argparse booleaness pyinstaller
 
 # ##### ##### ##### ##### ##### https://github.com/microsoft/pyright/blob/main/docs/configuration.md ##### ##### ##### ##### #####
 

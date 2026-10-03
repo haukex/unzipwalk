@@ -90,7 +90,7 @@ EXPECT :tuple[ExpectedResult, ...] = (
         b"33333\n3333\n333\n33\n3\n", FileType.FILE, 20 ),
     ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/xyz.7z")), None, FileType.ARCHIVE, 245 ),
 
-    ExpectedResult( (Path("opt.7z"),), None, FileType.ARCHIVE, 319 ),
+    ExpectedResult( (Path("opt.7z"),), None, FileType.ARCHIVE, 354 ),
 
     ExpectedResult( (Path("subdir"),), None, FileType.DIR, None ),
     ExpectedResult( (Path("subdir","ooo.txt"),), b"oOoOoOo\n\n", FileType.FILE, 9 ),
@@ -115,6 +115,7 @@ EXPECT_7Z :tuple[ExpectedResult, ...] = (
         b"Testing\r\nTesting", FileType.FILE, 16 ),
 
     ExpectedResult( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.DIR, None ),
+    ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/blah.txt")), b"blabla\n", FileType.FILE, 7 ),
     ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.ARCHIVE, 140 ),
     ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz"), PurePosixPath("uvw.txt")), b"This\nis\na\n7z\ntest\n", FileType.FILE, 18 ),
 )

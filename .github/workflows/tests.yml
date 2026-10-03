@@ -34,10 +34,7 @@ jobs:
           allow-prereleases: true
           # https://github.com/actions/setup-python#caching-packages-dependencies
           cache: pip
-          # remember to keep in sync with Makefile:
-          cache-dependency-path: |
-            requirements.txt
-            dev/requirements.txt
+          cache-dependency-path: pyproject.toml
       - name: Install dependencies
         run: make installdeps
       - name: Run checks and lint
@@ -49,4 +46,4 @@ jobs:
         run: make nix-checks shellcheck
       - name: Tests and Coverage
         run: make coverage
-# spell-checker: ignore shellcheck installdeps
+# spell-checker: ignore shellcheck installdeps pyproject

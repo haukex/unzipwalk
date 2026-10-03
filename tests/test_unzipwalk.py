@@ -115,6 +115,7 @@ class TestUnzipWalk(unittest.TestCase):
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 ) ]
                     + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.SKIP, None ),
+                        ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/blah.txt")), None, FileType.SKIP, None ),
                         ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
                 ), sorted( map(r2e, uut.unzipwalk(os.curdir, matcher=lambda p: not ( len(p)>1 and p[1].parts[0] == 'thing' ) ) ) ) )
 

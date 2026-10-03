@@ -34,7 +34,7 @@ are detected based on the aforementioned extensions.
 **Note** that [`unzipwalk()`](#function-unzipwalk) automatically closes files as it goes from file to file.
 This means that you must use the handles as soon as you get them from the generator -
 something as seemingly simple as `sorted(unzipwalk('.'))` would cause the code above to fail,
-because all files will have been opened and closed during the call to [`sorted()`](https://docs.python.org/3/library/functions.html#sorted)
+because all files will have been opened and closed during the call to [`sorted()`](https://docs.python.org/3/builtins/functions.html#sorted)
 and the handles to read the data would no longer be available in the body of the loop.
 This is why the above example first processes all the files before sorting the results.
 You can also use [`recursive_open()`](#unzipwalk.recursive_open) to open the files later, though using that function
@@ -77,7 +77,7 @@ Using the original filename from the gzip file’s header is currently not possi
 
 <a id="function-unzipwalk"></a>
 
-### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/library/stdtypes.html#str)] | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/library/stdtypes.html#str)] | [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath)]], [bool](https://docs.python.org/3/library/functions.html#bool)] | [None](https://docs.python.org/3/library/constants.html#None) = None, raise_errors: [bool](https://docs.python.org/3/library/functions.html#bool) = True) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[UnzipWalkResult](#unzipwalk.UnzipWalkResult), [None](https://docs.python.org/3/library/constants.html#None), [None](https://docs.python.org/3/library/constants.html#None)]
+### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)] | [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)] | [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath)]], [bool](https://docs.python.org/3/builtins/functions.html#bool)] | [None](https://docs.python.org/3/builtins/constants.html#None) = None, raise_errors: [bool](https://docs.python.org/3/builtins/functions.html#bool) = True) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[UnzipWalkResult](#unzipwalk.UnzipWalkResult), [None](https://docs.python.org/3/builtins/constants.html#None), [None](https://docs.python.org/3/builtins/constants.html#None)]
 
 This generator recursively walks into directories and compressed files and yields named tuples of type [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
 
@@ -106,11 +106,11 @@ Do not rely on the order of results! But see also the discussion in the main doc
 e.g. `sorted(unzipwalk(...))` automatically closes files and so may not be what you want.
 
 * **Raises:**
-  [**Exception**](https://docs.python.org/3/library/exceptions.html#Exception) – Because of the various underlying libraries, both this function and [`recursive_open()`](#unzipwalk.recursive_open) can raise
+  [**Exception**](https://docs.python.org/3/builtins/exceptions.html#Exception) – Because of the various underlying libraries, both this function and [`recursive_open()`](#unzipwalk.recursive_open) can raise
   a variety of exceptions: [`zipfile.BadZipFile`](https://docs.python.org/3/library/zipfile.html#zipfile.BadZipFile), [`tarfile.TarError`](https://docs.python.org/3/library/tarfile.html#tarfile.TarError), `py7zr.exceptions.ArchiveError`
   and its subclasses like [`py7zr.Bad7zFile`](https://py7zr.readthedocs.io/en/stable/api.html#py7zr.Bad7zFile), [`gzip.BadGzipFile`](https://docs.python.org/3/library/gzip.html#gzip.BadGzipFile), [`zlib.error`](https://docs.python.org/3/library/zlib.html#zlib.error), [`lzma.LZMAError`](https://docs.python.org/3/library/lzma.html#lzma.LZMAError),
-  [`EOFError`](https://docs.python.org/3/library/exceptions.html#EOFError), various [`OSError`](https://docs.python.org/3/library/exceptions.html#OSError)s, and other exceptions may be possible. Therefore, you may need to catch
-  all [`Exception`](https://docs.python.org/3/library/exceptions.html#Exception)s to play it safe.
+  [`EOFError`](https://docs.python.org/3/builtins/exceptions.html#EOFError), various [`OSError`](https://docs.python.org/3/builtins/exceptions.html#OSError)s, and other exceptions may be possible. Therefore, you may need to catch
+  all [`Exception`](https://docs.python.org/3/builtins/exceptions.html#Exception)s to play it safe.
 
 #### IMPORTANT
 Errors from [`gzip`](https://docs.python.org/3/library/gzip.html#module-gzip), [`bz2`](https://docs.python.org/3/library/bz2.html#module-bz2), and [`lzma`](https://docs.python.org/3/library/lzma.html#module-lzma) (`.gz`, `.bz2`, and `.xz` files,
@@ -119,11 +119,11 @@ exception handler around your `read()` call!
 
 <a id="unzipwalk.UnzipWalkResult"></a>
 
-### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/library/constants.html#None) = None, size: [int](https://docs.python.org/3/library/functions.html#int) | [None](https://docs.python.org/3/library/constants.html#None) = None)
+### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, size: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None) = None)
 
 Return type for [`unzipwalk()`](#function-unzipwalk).
 
-#### names *: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...]*
+#### names *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...]*
 
 A tuple of the filename(s) as [`pathlib`](https://docs.python.org/3/library/pathlib.html#module-pathlib) objects. The first element is always the physical file in the file system.
 If the tuple has more than one element, then the yielded file is contained in a compressed file, possibly nested in
@@ -133,16 +133,16 @@ other compressed file(s), and the last element of the tuple will contain the fil
 
 A [`FileType`](#unzipwalk.FileType) value representing the type of the current file.
 
-#### hnd *: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/library/constants.html#None)*
+#### hnd *: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/builtins/constants.html#None)*
 
 When [`typ`](#unzipwalk.UnzipWalkResult.typ) is [`FileType.FILE`](#unzipwalk.FileType), this is a [`ReadOnlyBinary`](#unzipwalk.ReadOnlyBinary) file handle (file object)
-for reading the file contents in binary mode. Otherwise, this is [`None`](https://docs.python.org/3/library/constants.html#None).
+for reading the file contents in binary mode. Otherwise, this is [`None`](https://docs.python.org/3/builtins/constants.html#None).
 If this object was produced by [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line), this handle will read the checksum of the data, *not the data itself!*
 
-#### size *: [int](https://docs.python.org/3/library/functions.html#int) | [None](https://docs.python.org/3/library/constants.html#None)*
+#### size *: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None)*
 
 When [`typ`](#unzipwalk.UnzipWalkResult.typ) is [`FileType.FILE`](#unzipwalk.FileType) or [`FileType.ARCHIVE`](#unzipwalk.FileType), this field *may* hold the size of the
-file, if the compression format and library support knowing the compressed file’s size in advance. Otherwise, this is [`None`](https://docs.python.org/3/library/constants.html#None).
+file, if the compression format and library support knowing the compressed file’s size in advance. Otherwise, this is [`None`](https://docs.python.org/3/builtins/constants.html#None).
 
 #### validate() → [UnzipWalkResult](#unzipwalk.UnzipWalkResult)
 
@@ -154,11 +154,11 @@ Intended for internal use, mainly when type checkers are not being used.
 * **Returns:**
   The object itself, for method chaining.
 * **Raises:**
-  [**ValueError**](https://docs.python.org/3/library/exceptions.html#ValueError)**,** [**TypeError**](https://docs.python.org/3/library/exceptions.html#TypeError) – If the object is invalid.
+  [**ValueError**](https://docs.python.org/3/builtins/exceptions.html#ValueError)**,** [**TypeError**](https://docs.python.org/3/builtins/exceptions.html#TypeError) – If the object is invalid.
 
 <a id="unzipwalk.UnzipWalkResult.checksum_line"></a>
 
-#### checksum_line(hash_algo: [str](https://docs.python.org/3/library/stdtypes.html#str), \*, raise_errors: [bool](https://docs.python.org/3/library/functions.html#bool) = True) → [str](https://docs.python.org/3/library/stdtypes.html#str)
+#### checksum_line(hash_algo: [str](https://docs.python.org/3/builtins/stdtypes.html#str), \*, raise_errors: [bool](https://docs.python.org/3/builtins/functions.html#bool) = True) → [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 Encodes this object into a line of text suitable for use as a checksum line.
 
@@ -175,7 +175,7 @@ Requires that the file handle be open (for files), and will read from it to gene
 
 <a id="unzipwalk.UnzipWalkResult.from_checksum_line"></a>
 
-#### *classmethod* from_checksum_line(line: [str](https://docs.python.org/3/library/stdtypes.html#str), \*, windows: [bool](https://docs.python.org/3/library/functions.html#bool) = False) → [UnzipWalkResult](#unzipwalk.UnzipWalkResult) | [None](https://docs.python.org/3/library/constants.html#None)
+#### *classmethod* from_checksum_line(line: [str](https://docs.python.org/3/builtins/stdtypes.html#str), \*, windows: [bool](https://docs.python.org/3/builtins/functions.html#bool) = False) → [UnzipWalkResult](#unzipwalk.UnzipWalkResult) | [None](https://docs.python.org/3/builtins/constants.html#None)
 
 Decodes a checksum line as produced by [`checksum_line()`](#unzipwalk.UnzipWalkResult.checksum_line).
 
@@ -188,12 +188,12 @@ the data from the file, instead it will be a handle to read the checksum of the 
 
 * **Parameters:**
   * **line** – The line to parse.
-  * **windows** – Set this to [`True`](https://docs.python.org/3/library/constants.html#True) if the pathname in the line is in Windows format,
+  * **windows** – Set this to [`True`](https://docs.python.org/3/builtins/constants.html#True) if the pathname in the line is in Windows format,
     otherwise it is assumed the filename is in POSIX format.
 * **Returns:**
-  The [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) object, or [`None`](https://docs.python.org/3/library/constants.html#None) for empty or comment lines.
+  The [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) object, or [`None`](https://docs.python.org/3/builtins/constants.html#None) for empty or comment lines.
 * **Raises:**
-  [**ValueError**](https://docs.python.org/3/library/exceptions.html#ValueError) – If the line could not be parsed.
+  [**ValueError**](https://docs.python.org/3/builtins/exceptions.html#ValueError) – If the line could not be parsed.
 
 <a id="unzipwalk.FileType"></a>
 
@@ -234,7 +234,7 @@ An error was encountered with this file, when the `raise_errors` option is off.
 
 <a id="unzipwalk.recursive_open"></a>
 
-### unzipwalk.recursive_open(fns: [Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/library/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/library/stdtypes.html#str)]], encoding: [str](https://docs.python.org/3/library/stdtypes.html#str) | [None](https://docs.python.org/3/library/constants.html#None) = None, errors: [str](https://docs.python.org/3/library/stdtypes.html#str) | [None](https://docs.python.org/3/library/constants.html#None) = None, newline: [str](https://docs.python.org/3/library/stdtypes.html#str) | [None](https://docs.python.org/3/library/constants.html#None) = None) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | TextIOWrapper, [None](https://docs.python.org/3/library/constants.html#None), [None](https://docs.python.org/3/library/constants.html#None)]
+### unzipwalk.recursive_open(fns: [Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]], encoding: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, errors: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, newline: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | TextIOWrapper, [None](https://docs.python.org/3/builtins/constants.html#None), [None](https://docs.python.org/3/builtins/constants.html#None)]
 
 This context manager allows opening files nested inside archives directly.
 
@@ -259,8 +259,8 @@ Hi, I'm a compressed file!
 ```
 
 * **Raises:**
-  * [**ImportError**](https://docs.python.org/3/library/exceptions.html#ImportError) – If you try to open a 7z file but [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is not installed.
-  * [**Exception**](https://docs.python.org/3/library/exceptions.html#Exception) – See description in [`unzipwalk()`](#function-unzipwalk).
+  * [**ImportError**](https://docs.python.org/3/builtins/exceptions.html#ImportError) – If you try to open a 7z file but [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is not installed.
+  * [**Exception**](https://docs.python.org/3/builtins/exceptions.html#Exception) – See description in [`unzipwalk()`](#function-unzipwalk).
 
 <a id="unzipwalk.ReadOnlyBinary"></a>
 
@@ -270,22 +270,22 @@ Interface for the file handle (file object) used in [`UnzipWalkResult`](#unzipwa
 
 This is essentially the intersection of what the underlying objects support.
 
-#### close() → [None](https://docs.python.org/3/library/constants.html#None)
+#### close() → [None](https://docs.python.org/3/builtins/constants.html#None)
 
 Close the file.
 
 #### NOTE
 [`unzipwalk()`](#function-unzipwalk) automatically closes files.
 
-#### *property* closed *: [bool](https://docs.python.org/3/library/functions.html#bool)*
+#### *property* closed *: [bool](https://docs.python.org/3/builtins/functions.html#bool)*
 
-#### readable() → [bool](https://docs.python.org/3/library/functions.html#bool)
+#### readable() → [bool](https://docs.python.org/3/builtins/functions.html#bool)
 
-#### read(n: [int](https://docs.python.org/3/library/functions.html#int) = -1, /) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
+#### read(n: [int](https://docs.python.org/3/builtins/functions.html#int) = -1, /) → [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)
 
-#### readline(limit: [int](https://docs.python.org/3/library/functions.html#int) = -1, /) → [bytes](https://docs.python.org/3/library/stdtypes.html#bytes)
+#### readline(limit: [int](https://docs.python.org/3/builtins/functions.html#int) = -1, /) → [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)
 
-#### seekable() → [bool](https://docs.python.org/3/library/functions.html#bool)
+#### seekable() → [bool](https://docs.python.org/3/builtins/functions.html#bool)
 
 See [`io.IOBase.seekable()`](https://docs.python.org/3/library/io.html#io.IOBase.seekable).
 
@@ -293,7 +293,7 @@ See [`io.IOBase.seekable()`](https://docs.python.org/3/library/io.html#io.IOBase
 Some underlying classes may return True even in cases where [`seek()`](#unzipwalk.ReadOnlyBinary.seek) will fail!
 (e.g. GH [python/cpython#77354](https://github.com/python/cpython/issues/77354))
 
-#### seek(offset: [int](https://docs.python.org/3/library/functions.html#int), whence: [int](https://docs.python.org/3/library/functions.html#int) = 0, /) → [int](https://docs.python.org/3/library/functions.html#int)
+#### seek(offset: [int](https://docs.python.org/3/builtins/functions.html#int), whence: [int](https://docs.python.org/3/builtins/functions.html#int) = 0, /) → [int](https://docs.python.org/3/builtins/functions.html#int)
 
 ### unzipwalk.ARCHIVE_RE *= re.compile('\\\\.(?:tar(?:\\\\.gz|\\\\.bz2|\\\\.xz)?|tgz|txz|tbz2?|zip|7z|bz2|xz|gz)\\\\Z', re.IGNORECASE)*
 

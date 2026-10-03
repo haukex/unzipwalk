@@ -1,6 +1,11 @@
 Changelog for unzipwalk
 =======================
 
+1.9.2 - Sat, Oct  3 2026
+------------------------
+
+- Fixed an issue extracting 7z archives with more than one member.
+
 1.9.1 - Fri, Aug 28 2026
 ------------------------
 

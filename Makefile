@@ -6,8 +6,6 @@
 # Adapt these variables for this project:
 py_code_locs = unzipwalk tests docs/*.py docs/_ext/*.py
 # Hint: $(filter-out whatever,$(py_code_locs))
-# Remember to keep in sync with GitHub Actions workflows:
-requirement_txts = requirements.txt dev/requirements.txt docs/requirements.txt
 perm_checks = ./* .gitignore .vscode .github
 
 # The user can change the following on the command line:
@@ -24,7 +22,7 @@ test:   smoke-checks nix-checks shellcheck ver-checks coverage  ## Run all tests
 SHELL = /bin/bash
 .ONESHELL:  # each recipe is executed as a single script
 
-README.md: docs/requirements.txt docs/conf.py docs/index.rst unzipwalk/__init__.py
+README.md: docs/conf.py docs/index.rst unzipwalk/__init__.py
 	@set -euxo pipefail
 	make -C docs output/markdown/index.md
 	cp docs/output/markdown/index.md README.md
@@ -60,9 +58,9 @@ tasklist:	## List open tasks.
 
 installdeps:  ## Install project dependencies
 	@set -euxo pipefail
-	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location pip
-	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location $(foreach x,$(requirement_txts),-r $(x))
-	# $(PYTHON3BIN) -m pip install --editable .  # for modules/packages
+	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location 'pip>=25.1'
+	# Note `--editable .` only installs this project as editable, not all deps. It also installs the project's dependencies.
+	$(PYTHON3BIN) -m pip install --upgrade --upgrade-strategy=eager --no-warn-script-location --editable . --group dev
 	# other examples: git lfs install / npm ci
 
 smoke-checks:  ## Basic smoke tests
@@ -123,10 +121,9 @@ ver-checks:  ## Checks that depend on the Python version
 	$(PYTHON3BIN) -m flake8 "$${flake8_opts[@]}" $(py_code_locs); \
 	$(PYTHON3BIN) -m pylint "$${pylint_opts[@]}" $(py_code_locs);
 
-outdated:  ## Check the dependency versions
-	@set -euo pipefail
-	# note the following is on one line b/c GitHub macOS Action Runners are running bash 3.2 and the multiline version didn't work there...
-	for REQ in $(requirement_txts); do $(PYTHON3BIN) -m pur --dry-run-changed -r "$$REQ"; done
+outdated:  ## Check installed packages (only) for newer versions - run installdeps first!
+	@set -euxo pipefail
+	$(PYTHON3BIN) -m pip list --outdated --exclude-editable
 
 unittest:  ## Run unit tests
 	$(PYTHON3BIN) -X dev -X warn_default_encoding -W error -m unittest -v
