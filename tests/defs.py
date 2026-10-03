@@ -29,7 +29,7 @@ from copy import deepcopy
 from contextlib import contextmanager
 from collections.abc import Generator
 from tempfile import TemporaryDirectory
-from typing import Optional, NamedTuple
+from typing import Optional, NamedTuple, Iterable
 from pathlib import PurePath, Path, PurePosixPath
 from igbpyutils.file import Pushd
 from unzipwalk import FileType, UnzipWalkResult
@@ -44,9 +44,9 @@ class ExpectedResult(NamedTuple):
     typ :FileType
     size :Optional[int]
 
-def r2e(r :UnzipWalkResult) -> ExpectedResult:
+def r2e(rs :Iterable[UnzipWalkResult]) -> list[ExpectedResult]:
     """Helper function for tests to simplify comparisons."""
-    return ExpectedResult(fns=r.names, data=None if r.hnd is None else r.hnd.read(), typ=r.typ, size=r.size)
+    return sorted( ExpectedResult(fns=r.names, data=None if r.hnd is None else r.hnd.read(), typ=r.typ, size=r.size) for r in rs )
 
 EXPECT :tuple[ExpectedResult, ...] = (
     ExpectedResult( (Path("test.csv"),), b'"ID","Name","Age"\n1,"Foo",23\n2,"Bar",45\n3,"Quz",67\n', FileType.FILE, 51 ),
