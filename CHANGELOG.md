@@ -10,6 +10,7 @@ Changelog for unzipwalk
   no longer descended into, including directories passed as input paths.
 - Directory traversal errors now respect `raise_errors`: they are raised by default, or when
   `raise_errors=False`, they are reported as `ERROR` results and traversal continues.
+- Fixed path type handling in `recursive_open`.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------

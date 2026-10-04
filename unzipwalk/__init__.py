@@ -126,9 +126,9 @@ from lzma import LZMAFile
 from tarfile import TarFile
 from zipfile import ZipFile
 from contextlib import contextmanager
-from pathlib import PurePosixPath, Path
 from typing import Optional, cast, IO, Union
 from collections.abc import Generator, Sequence
+from pathlib import PurePosixPath, Path, PurePath
 from igbpyutils.file import AnyPaths, to_Paths, Filename
 from .defs import FileType, UnzipWalkResult, ReadOnlyBinary, FilterType, FileProcessorArgs, ProcessCallContext, RecursiveOpenArgs
 
@@ -228,7 +228,17 @@ def recursive_open(fns :Sequence[Filename], encoding :Optional[str] = None, erro
     if not fns:
         raise ValueError('no filenames given')
     with open(fns[0], 'rb') as fh:
-        with _inner_recur_open(RecursiveOpenArgs(fns=(Path(fns[0]),) + tuple( PurePosixPath(f) for f in fns[1:] ), fh=fh)) as inner:
+        # See test_recur_open_path_types for details on why the following path class remapping is necessary,
+        # but basically, because _inner_recur_open checks the filenames of bz2/xz/gz with equality operators,
+        # we need to match the object types that unzipwalk outputs.
+        fn_paths :list[PurePath] = [Path(fns[0])]
+        path_cls :type[PurePath] = Path
+        for fn in fns[1:]:
+            bl = fn_paths[-1].name.lower()
+            if _TARFILE_RE.search(bl) or bl.endswith(('.zip', '.7z')):
+                path_cls = PurePosixPath
+            fn_paths.append(path_cls(fn))
+        with _inner_recur_open(RecursiveOpenArgs(fns=tuple(fn_paths), fh=fh)) as inner:
             assert inner.readable(), inner
             if encoding is not None or errors is not None or newline is not None:
                 yield io.TextIOWrapper(inner, encoding=encoding, errors=errors, newline=newline)

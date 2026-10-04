@@ -29,12 +29,13 @@ import errno
 import doctest
 import unittest
 from hashlib import sha1
-from lzma import LZMAError
-from gzip import BadGzipFile
 from tarfile import TarError
 from zipfile import BadZipFile
 from unittest.mock import patch
 from tempfile import TemporaryDirectory
+from bz2 import compress as bz2_compress
+from lzma import LZMAError, compress as lzma_compress
+from gzip import BadGzipFile, compress as gzip_compress
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from py7zr.exceptions import ArchiveError
 import unzipwalk as uut
@@ -183,6 +184,49 @@ class TestUnzipWalk(unittest.TestCase):
             with self.assertRaises(ValueError):
                 with uut.recursive_open(("test.csv", "blammo")):
                     pass  # pragma: no cover
+
+    def test_recur_open_path_types(self) -> None:
+        # Previously, `recursive_open` would map all of `fns[1:]` to PurePosixPath. However, `unzipwalk`'s output
+        # differs from that, because .bz2, .xz, and .gz's `a.fns[-1].with_suffix('')` return a platform-native path.
+        with TemporaryDirectory() as td:
+            # Check that gz/bz2/xz use fn.with_suffix('')
+            for ext, compress in (('gz', gzip_compress), ('bz2', bz2_compress), ('xz', lzma_compress)):
+                fn = Path(td)/f"file.txt.{ext}"
+                fn.write_bytes(compress(b'compressed'))
+                names = [ r.names for r in uut.unzipwalk(fn) if r.typ==FileType.FILE ]
+                self.assertEqual(names, [ (fn, fn.with_suffix('')) ])
+                for path_cls in (Path, PureWindowsPath, PurePosixPath):
+                    for as_str in (False, True):
+                        with self.subTest(ext=ext, path_cls=path_cls.__name__, as_str=as_str):
+                            fns = tuple(str(path_cls(n)) if as_str else path_cls(n) for n in names[0])
+                            with (fn.open('rb') as raw, patch('unzipwalk.Path', path_cls),
+                                    patch('unzipwalk.open', return_value=raw, create=True) as mock_open):
+                                with uut.recursive_open(fns) as fh:
+                                    self.assertEqual(fh.read(), b'compressed')
+                                mock_open.assert_called_once_with(fns[0], 'rb')
+            # Check the above, plus that ZIP members still use PurePosixPath
+            fn = Path(td)/'archive.zip.gz.xz'
+            fn.write_bytes(lzma_compress(gzip_compress((Path(__file__).parent/'zips'/'WinTest.ZIP').read_bytes())))
+            names = [ r.names for r in uut.unzipwalk(fn) if r.typ==FileType.FILE and r.names[-1]==PurePosixPath('World/Hello.txt') ]
+            self.assertEqual(names, [ (fn, fn.with_suffix(''), fn.with_suffix('').with_suffix(''), PurePosixPath('World/Hello.txt') )])
+            for path_cls in (Path, PureWindowsPath, PurePosixPath):
+                for as_str in (False, True):
+                    with self.subTest(ext='zip.gz.xz', path_cls=path_cls.__name__, as_str=as_str):
+                        fns = tuple(str(path_cls(n)) if as_str else path_cls(n) for n in names[0][:-1]) \
+                            + (str(names[0][-1]) if as_str else path_cls(names[0][-1]),)
+                        with (fn.open('rb') as raw, patch('unzipwalk.Path', path_cls),
+                                patch('unzipwalk.open', return_value=raw, create=True) as mock_open):
+                            with uut.recursive_open(fns) as fh:
+                                self.assertEqual(fh.read(), b'Hello\r\nWorld')
+                            mock_open.assert_called_once_with(fns[0], 'rb')
+        # Test that recursive_open works no matter what path classes are given as inputs
+        with TestCaseContext() as expect:
+            for file in expect:
+                if file.typ==FileType.FILE and len(file.fns)>1:
+                    for member_path_cls in (Path, PurePosixPath, PureWindowsPath):
+                        with self.subTest(names=file.fns, path_cls=member_path_cls.__name__):
+                            with uut.recursive_open((file.fns[0],) + tuple(member_path_cls(n) for n in file.fns[1:])) as fh:
+                                self.assertEqual(fh.read(), file.data)
 
     def test_result_validate(self) -> None:
         with self.assertRaises(ValueError):
