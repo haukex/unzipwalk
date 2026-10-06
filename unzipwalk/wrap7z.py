@@ -23,8 +23,9 @@ You should have received a copy of the GNU Lesser General Public License
 along with this program. If not, see https://www.gnu.org/licenses/
 """
 from typing import Union, Optional, cast, BinaryIO, IO
+from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory
 from collections.abc import Generator
-from pathlib import PurePosixPath
 from contextlib import ExitStack
 from io import BytesIO
 # If py7zr isn't available, the following line will raise an exception, causing the imports following it to not be executed.
@@ -32,37 +33,51 @@ import py7zr     # pylint: disable=import-error,useless-suppression  # pyright: 
 import py7zr.io  # pylint: disable=import-error,useless-suppression  # pyright: ignore [reportMissingImports]
 from .defs import FileType, UnzipWalkResult, FileProcessor, FileProcessorArgs, RecursiveOpener, RecursiveOpenArgs
 
-# spell-checker: ignore getbuffer nbytes
-
 class Py7zBytesIO(py7zr.io.Py7zIO):  # pyright: ignore [reportUntypedBaseClass]
-    def __init__(self, buffer :BytesIO):
+    def __init__(self, buffer :IO[bytes]):
         self._buffer = buffer
     def write(self, s :Union[bytes, bytearray]) -> int:
         return self._buffer.write(s)
     def read(self, size :Optional[int] = None) -> bytes:
-        return self._buffer.read(size)
+        return self._buffer.read(-1 if size is None else size)
     def seek(self, offset :int, whence :int = 0) -> int:
         return self._buffer.seek(offset, whence)
     def flush(self) -> None:
         return self._buffer.flush()
     def size(self) -> int:
-        return self._buffer.getbuffer().nbytes
+        position = self._buffer.tell()
+        self._buffer.seek(0, 2)
+        size = self._buffer.tell()
+        self._buffer.seek(position)
+        return size
+
+class SpoolWriter(Py7zBytesIO):
+    def __init__(self, buffer :IO[bytes]):
+        super().__init__(buffer)
+        self.complete = False
+    def close(self) -> None:
+        # py7zr calls this only after the member's decompression and CRC check succeed.
+        self._buffer.close()
+        self.complete = True
+
+class SpoolFactory(py7zr.io.WriterFactory):
+    def __init__(self, directory :Path, stack :ExitStack):
+        self.directory = directory
+        self._stack = stack
+        self.writers :dict[str, SpoolWriter] = {}
+    def create(self, filename :str) -> py7zr.io.Py7zIO:
+        writer = SpoolWriter(self._stack.enter_context((self.directory/filename).open('w+b')))
+        self.writers[filename] = writer
+        return writer
 
 class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUntypedBaseClass]
-    def __init__(self, occurrence :Optional[int] = None) -> None:
+    def __init__(self) -> None:
         self._filename :Optional[str] = None
         self._buffer :Optional[BytesIO] = None
-        self._occurrence = occurrence
-        self._created = 0
     def create(self, filename :str) -> py7zr.io.Py7zIO:
-        # If there are multiple files of exactly the same name, then py7zr calls this factory
-        # method for each of the files. However, each _read_one() call needs one occurrence.
+        # If there are multiple files of exactly the same name, then py7zr calls this factory method for each occurrence.
         if not isinstance(filename, str):  # pyright: ignore [reportUnnecessaryIsInstance]
             raise TypeError()
-        if self._occurrence is not None:
-            self._created += 1
-            if self._created != self._occurrence+1:
-                return py7zr.io.NullIO()
         if self._filename is not None or self._buffer is not None:
             raise FileExistsError(f"Attempt to create second file on this factory: {filename!r}")
         self._filename = filename
@@ -79,10 +94,10 @@ class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUn
 class Wrap7Z:
 
     @staticmethod
-    def _read_one(sz :py7zr.SevenZipFile, fn :str, occurrence :Optional[int] = None) -> BytesIO:
+    def _read_one(sz :py7zr.SevenZipFile, fn :str) -> BytesIO:
         """Read one file from a 7z archive as a BytesIO object."""
         with ExitStack() as stack:
-            fact = SingleBytesIOFactory(occurrence)
+            fact = SingleBytesIOFactory()
             stack.callback(fact.close)
             sz.reset()
             sz.extract(targets=[str(fn)], factory=fact)
@@ -105,34 +120,42 @@ class Wrap7Z:
     def process_7z(a :FileProcessorArgs, recurse :FileProcessor) -> Generator[UnzipWalkResult, None, None]:
         try:
             # The cast from IO[bytes] to BinaryIO should be ok here I think:
-            with py7zr.SevenZipFile(cast(BinaryIO, a.fh)) as sz:
-                occurrences :dict[str, int] = {}
-                for f7 in sz.list():
-                    # `sz.list()` returns one FileInfo instance per archive entry, including for filenames that occur more than once.
-                    # But as noted in SingleBytesIOFactory, py7zr's extraction API will extract all files of the same name when requesting
-                    # extraction by filename, as we do here, so we also need to keep track of which of the occurrences we are requesting.
-                    occurrence = occurrences.get(f7.filename, 0)
-                    if not f7.is_directory:
-                        occurrences[f7.filename] = occurrence+1
+            with py7zr.SevenZipFile(cast(BinaryIO, a.fh)) as sz, TemporaryDirectory() as tmp_dir:
+                members = sz.list()
+                accepted = [a.ctx.matcher is None or a.ctx.matcher((*a.raw_names, f7.filename)) for f7 in members]
+                targets = [str(i) for i, f7 in enumerate(members) if accepted[i] and f7.is_file]
+                # Keep member contents on disk, closing each write handle as extraction finishes.
+                # The stack also closes partial outputs after extraction errors, before any results are yielded.
+                with ExitStack() as stack:
+                    factory = SpoolFactory(Path(tmp_dir), stack)
+                    if targets:
+                        # The writer API receives sanitized names. Give this reader's metadata unique internal names so
+                        # duplicate names and names like './file.txt' and 'file.txt' cannot collide during extraction.
+                        # The archive itself and the original names saved in `members` are unchanged.
+                        for i, member in enumerate(sz.files):
+                            member.file_properties()['filename'] = str(i)
+                        try:
+                            sz.extract(targets=targets, factory=factory)
+                        except Exception:
+                            if a.ctx.raise_errors:
+                                raise
+                            # Completed members remain usable; incomplete or unprocessed members are reported below.
+                for i, f7 in enumerate(members):
                     new_names = (*a.fns, PurePosixPath(f7.filename))
                     new_raw = (*a.raw_names, f7.filename)
-                    if a.ctx.matcher is not None and not a.ctx.matcher(new_raw):
+                    if not accepted[i]:
                         yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.SKIP)
                     elif f7.is_symlink:
                         yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.SYMLINK)
                     elif f7.is_directory:
                         yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.DIR)
                     elif f7.is_file:
-                        try:
-                            bio = Wrap7Z._read_one(sz, f7.filename, occurrence)
-                        except Exception:  # pylint: disable=[duplicate-code]
-                            if a.ctx.raise_errors:
-                                raise
+                        if str(i) not in factory.writers or not factory.writers[str(i)].complete:
                             yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.ERROR)
                         else:
-                            with bio:
+                            with open(factory.directory/str(i), 'rb') as fh:
                                 yield from recurse(FileProcessorArgs(
-                                    fns=new_names, raw_names=new_raw, fh=bio, size=f7.uncompressed, ctx=a.ctx))
+                                    fns=new_names, raw_names=new_raw, fh=fh, size=f7.uncompressed, ctx=a.ctx))
                     else:
                         yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.OTHER)
         except Exception:  # pylint: disable=[duplicate-code]

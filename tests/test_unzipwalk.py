@@ -29,6 +29,7 @@ import errno
 import doctest
 import unittest
 from hashlib import sha1
+from typing import IO, Literal
 from collections.abc import Sequence, Generator
 from contextlib import contextmanager, closing, ExitStack, nullcontext
 from tarfile import TarError
@@ -40,6 +41,7 @@ from lzma import LZMAError, compress as lzma_compress
 from gzip import BadGzipFile, compress as gzip_compress
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from py7zr.exceptions import ArchiveError
+from igbpyutils.file import Filename
 import unzipwalk as uut
 from unzipwalk import FileType
 from .defs import EXPECT, EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
@@ -47,13 +49,19 @@ from .defs import EXPECT, EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, 
 # spell: ignore strerror blabla
 
 @contextmanager
-def capture_7z_buffers() -> Generator[list[io.BytesIO], None, None]:
-    buffers :list[io.BytesIO] = []
+def capture_7z_buffers() -> Generator[list[IO[bytes]], None, None]:
+    buffers :list[IO[bytes]] = []
     def new_buffer() -> io.BytesIO:
         buffer = io.BytesIO()
         buffers.append(buffer)
         return buffer
-    with patch('unzipwalk.wrap7z.BytesIO', side_effect=new_buffer):
+    def open_buffer(filename :Filename, mode :Literal['rb']) -> IO[bytes]:
+        # The walker takes ownership of each returned handle; the tests verify it closes them.
+        buffer = open(filename, mode)  # pylint: disable=consider-using-with
+        buffers.append(buffer)
+        return buffer
+    with (patch('unzipwalk.wrap7z.BytesIO', side_effect=new_buffer),
+          patch('unzipwalk.wrap7z.open', side_effect=open_buffer, create=True)):
         yield buffers
 
 def load_tests(_loader :unittest.TestLoader, tests :unittest.TestSuite, _ignore :str|None) -> unittest.TestSuite:
