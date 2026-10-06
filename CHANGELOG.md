@@ -24,6 +24,8 @@ Changelog for unzipwalk
 - Duplicate names in 7z archives are now yielded as separate results with their individual contents.
 - Extracted 7z member buffers are now closed when iteration advances or is closed, and when
   `recursive_open` exits, including error paths.
+- 7z symlinks and other special entries are now reported as `SYMLINK` and `OTHER`, respectively,
+  instead of being processed as regular files.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------

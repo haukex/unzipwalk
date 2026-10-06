@@ -118,9 +118,11 @@ class Wrap7Z:
                     new_raw = (*a.raw_names, f7.filename)
                     if a.ctx.matcher is not None and not a.ctx.matcher(new_raw):
                         yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.SKIP)
+                    elif f7.is_symlink:
+                        yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.SYMLINK)
                     elif f7.is_directory:
                         yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.DIR)
-                    else:
+                    elif f7.is_file:
                         try:
                             bio = Wrap7Z._read_one(sz, f7.filename, occurrence)
                         except Exception:  # pylint: disable=[duplicate-code]
@@ -131,6 +133,8 @@ class Wrap7Z:
                             with bio:
                                 yield from recurse(FileProcessorArgs(
                                     fns=new_names, raw_names=new_raw, fh=bio, size=f7.uncompressed, ctx=a.ctx))
+                    else:
+                        yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.OTHER)
         except Exception:  # pylint: disable=[duplicate-code]
             if a.ctx.raise_errors:
                 raise

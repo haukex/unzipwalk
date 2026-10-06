@@ -432,6 +432,26 @@ class TestUnzipWalk(unittest.TestCase):
                 self.assertTrue(buffers)
                 self.assertTrue(all(b.closed for b in buffers))
 
+    def test_7z_member_types(self) -> None:
+        archive = Path(__file__).parent/'member_types.7z'
+        expected = [
+            ('folder', FileType.DIR, None), ('target.txt', FileType.FILE, b'target contents'),
+            ('fifo.gz', FileType.OTHER, None), ('socket.zip', FileType.OTHER, None),
+            ('shared.txt', FileType.FILE, b'regular duplicate'), ('member_types.7z', FileType.ARCHIVE, None),
+        ] + [(name, FileType.SYMLINK, None) for name in (
+            'link.txt', 'link.gz', 'link.bz2', 'link.xz', 'link.zip', 'link.tar', 'link.7z', 'shared.txt', 'dir_link.zip')]
+        with capture_7z_buffers() as buffers:
+            self.assertCountEqual([(os.path.basename(r.raw_names[-1]), r.typ, r.hnd.read() if r.hnd is not None else None)
+                for r in uut.unzipwalk(archive)], expected)
+            self.assertEqual(len(buffers), 2)
+            self.assertTrue(all(b.closed for b in buffers))
+        with patch('py7zr.SevenZipFile.extract') as extract:
+            self.assertCountEqual([(os.path.basename(r.raw_names[-1]), r.typ, r.hnd.read() if r.hnd is not None else None)
+                for r in uut.unzipwalk(archive, matcher=lambda names: names[-1] not in ('target.txt', 'shared.txt', 'link.gz', 'fifo.gz'))],
+                [(name, FileType.SKIP if name in ('target.txt', 'shared.txt', 'link.gz', 'fifo.gz') else typ, None)
+                    for name, typ, _ in expected])
+            extract.assert_not_called()
+
     def test_wrap7z(self) -> None:
         from unzipwalk.wrap7z import Py7zBytesIO, SingleBytesIOFactory  # pylint: disable=import-outside-toplevel
         pio = Py7zBytesIO(io.BytesIO(b'abc'))
