@@ -194,7 +194,8 @@ class UnzipWalkResult(NamedTuple):
             assert self.hnd is not None, self
             h = hashlib.new(hash_algo)
             try:
-                h.update(self.hnd.read())
+                while chunk := self.hnd.read(io.DEFAULT_BUFFER_SIZE):
+                    h.update(chunk)
             except Exception:
                 if raise_errors:
                     raise
