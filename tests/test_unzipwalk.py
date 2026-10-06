@@ -99,6 +99,28 @@ class TestUnzipWalk(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             list(uut.unzipwalk('/this_file_should_not_exist'))
 
+    def test_binary_handle_iteration(self) -> None:
+        with TestCaseContext() as expect:
+            files = {file.fns: file.data for file in expect if file.data is not None}
+            for result in uut.unzipwalk(os.curdir):
+                if result.hnd is not None:
+                    handle :uut.ReadOnlyBinary = result.hnd
+                    self.assertIs(iter(handle), handle)
+                    lines :list[bytes] = [next(handle, b'')]
+                    for line in result.hnd:
+                        lines.append(line)
+                    self.assertEqual(b''.join(lines), files.pop(result.names))
+            self.assertFalse(files)
+
+    def test_text_wrapper_handles(self) -> None:
+        with TestCaseContext() as expect:
+            files = {file.fns: file.data.decode('UTF-8') for file in expect if file.data is not None}
+            for result in uut.unzipwalk(os.curdir):
+                if result.hnd is not None:
+                    with io.TextIOWrapper(result.hnd, encoding='UTF-8', newline='') as handle:
+                        self.assertEqual(handle.read(), files.pop(result.names))
+            self.assertFalse(files)
+
     def test_unzipwalk_matcher(self) -> None:
         with TestCaseContext() as expect:
             # filter from the initial path list

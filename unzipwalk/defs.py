@@ -29,8 +29,8 @@ import enum
 import hashlib
 import posixpath
 from contextlib import AbstractContextManager
-from collections.abc import Callable, Sequence, Generator
 from pathlib import Path, PurePosixPath, PurePath, PureWindowsPath
+from collections.abc import Callable, Sequence, Generator, Iterator
 from typing import Optional, Protocol, NamedTuple, runtime_checkable, IO, Union, TypeVar, overload
 from igbpyutils.file import Filename
 from .utils import decode_tuple
@@ -59,9 +59,15 @@ class FileType(enum.IntEnum):
 
 @runtime_checkable
 class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
-    """Interface for the file handle (file object) used in :class:`UnzipWalkResult`.
+    """Common readable interface for the file handles used in :class:`UnzipWalkResult`.
 
-    This is essentially the intersection of what the underlying objects support."""
+    This protocol is used for runtime validation. Returned handles are annotated as
+    :class:`typing.IO` with binary contents for compatibility with standard I/O utilities.
+    The concrete stream depends on the compression format; attributes such as ``name``
+    are not available on every backend. Use :attr:`UnzipWalkResult.raw_names` for filenames.
+    """
+    def __iter__(self) -> Iterator[bytes]: ...
+    def __next__(self) -> bytes: ...
     def close(self) -> None:
         """Close the file.
 
@@ -133,10 +139,10 @@ class UnzipWalkResult(NamedTuple):
     raw_names :tuple[str, ...]
     #: A :class:`FileType` value representing the type of the current file.
     typ :FileType
-    #: When :attr:`typ` is :class:`FileType.FILE<FileType>`, this is a :class:`ReadOnlyBinary` file handle (file object)
-    #: for reading the file contents in binary mode. Otherwise, this is :obj:`None`.
+    #: When :attr:`typ` is :class:`FileType.FILE<FileType>`, this is a file handle (file object) for reading the file contents
+    #: in binary mode, validated at runtime against :class:`ReadOnlyBinary`. Otherwise, this is :obj:`None`.
     #: If this object was produced by :meth:`from_checksum_line`, this handle will read the checksum of the data, *not the data itself!*
-    hnd :Optional[ReadOnlyBinary] = None
+    hnd :Optional[IO[bytes]] = None
     #: When :attr:`typ` is :class:`FileType.FILE<FileType>` or :class:`FileType.ARCHIVE<FileType>`, this field *may* hold the size of the
     #: file, if the compression format and library support knowing the compressed file's size in advance. Otherwise, this is :obj:`None`.
     size :Optional[int] = None
@@ -222,7 +228,7 @@ class UnzipWalkResult(NamedTuple):
         """
         if not line.strip():
             return None
-        def mk_result(name :str, typ :FileType, hnd :Optional[ReadOnlyBinary] = None) -> 'UnzipWalkResult':
+        def mk_result(name :str, typ :FileType, hnd :Optional[IO[bytes]] = None) -> 'UnzipWalkResult':
             raw_names = decode_tuple(name) if name.startswith('(') else (name,)
             return cls(names=convert_names(raw_names, PureWindowsPath if windows else PurePosixPath, PurePosixPath),
                 raw_names=raw_names, typ=typ, hnd=hnd)

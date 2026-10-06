@@ -11,7 +11,7 @@ and ``tar.bz2``/``tbz``/``tbz2``, plus ``7z`` files if the Python package :mod:`
 are detected based on the aforementioned extensions.
 
     >>> from unzipwalk import unzipwalk
-    >>> results = []
+    >>> results :list[tuple[str, ...]] = []
     >>> for result in unzipwalk('.'):
     ...     names = tuple( name.as_posix() for name in result.names )
     ...     if result.hnd:  # result is a file opened for reading (binary)
@@ -48,6 +48,7 @@ For example, to read all CSV files in the current directory and below, including
     >>> import csv
     >>> for result in unzipwalk('.'):
     ...     if result.typ==FileType.FILE and result.names[-1].suffix.lower()=='.csv':
+    ...         assert result.hnd is not None
     ...         print([ name.as_posix() for name in result.names ])
     ...         with TextIOWrapper(result.hnd, encoding='UTF-8', newline='') as handle:
     ...             csv_rd = csv.reader(handle, strict=True)
@@ -208,7 +209,7 @@ def _inner_recur_open(a :RecursiveOpenArgs) -> Generator[IO[bytes], None, None]:
 
 @contextmanager
 def recursive_open(fns :Sequence[Filename], encoding :Optional[str] = None, errors :Optional[str] = None, newline :Optional[str] = None) \
-        -> Generator[Union[ReadOnlyBinary, io.TextIOWrapper], None, None]:
+        -> Generator[Union[IO[bytes], io.TextIOWrapper], None, None]:
     # note Sphinx's "WARNING: py:class reference target not found: _io.TextIOWrapper" can be ignored
     """This context manager allows opening files nested inside archives directly.
 

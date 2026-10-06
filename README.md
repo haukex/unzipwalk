@@ -12,7 +12,7 @@ are detected based on the aforementioned extensions.
 
 ```pycon
 >>> from unzipwalk import unzipwalk
->>> results = []
+>>> results :list[tuple[str, ...]] = []
 >>> for result in unzipwalk('.'):
 ...     names = tuple( name.as_posix() for name in result.names )
 ...     if result.hnd:  # result is a file opened for reading (binary)
@@ -50,6 +50,7 @@ For example, to read all CSV files in the current directory and below, including
 >>> import csv
 >>> for result in unzipwalk('.'):
 ...     if result.typ==FileType.FILE and result.names[-1].suffix.lower()=='.csv':
+...         assert result.hnd is not None
 ...         print([ name.as_posix() for name in result.names ])
 ...         with TextIOWrapper(result.hnd, encoding='UTF-8', newline='') as handle:
 ...             csv_rd = csv.reader(handle, strict=True)
@@ -126,7 +127,7 @@ exception handler around your `read()` call!
 
 <a id="unzipwalk.UnzipWalkResult"></a>
 
-### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], raw_names: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, size: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None) = None)
+### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], raw_names: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...], typ: [FileType](#unzipwalk.FileType), hnd: [IO](https://docs.python.org/3/library/typing.html#typing.IO)[[bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)] | [None](https://docs.python.org/3/builtins/constants.html#None) = None, size: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None) = None)
 
 Return type for [`unzipwalk()`](#function-unzipwalk).
 
@@ -148,10 +149,10 @@ path normalization. This field must have the same number of elements as [`names`
 
 A [`FileType`](#unzipwalk.FileType) value representing the type of the current file.
 
-#### hnd *: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/builtins/constants.html#None)*
+#### hnd *: [IO](https://docs.python.org/3/library/typing.html#typing.IO)[[bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)] | [None](https://docs.python.org/3/builtins/constants.html#None)*
 
-When [`typ`](#unzipwalk.UnzipWalkResult.typ) is [`FileType.FILE`](#unzipwalk.FileType), this is a [`ReadOnlyBinary`](#unzipwalk.ReadOnlyBinary) file handle (file object)
-for reading the file contents in binary mode. Otherwise, this is [`None`](https://docs.python.org/3/builtins/constants.html#None).
+When [`typ`](#unzipwalk.UnzipWalkResult.typ) is [`FileType.FILE`](#unzipwalk.FileType), this is a file handle (file object) for reading the file contents
+in binary mode, validated at runtime against [`ReadOnlyBinary`](#unzipwalk.ReadOnlyBinary). Otherwise, this is [`None`](https://docs.python.org/3/builtins/constants.html#None).
 If this object was produced by [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line), this handle will read the checksum of the data, *not the data itself!*
 
 #### size *: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None)*
@@ -251,7 +252,7 @@ An error was encountered with this file, when the `raise_errors` option is off.
 
 <a id="unzipwalk.recursive_open"></a>
 
-### unzipwalk.recursive_open(fns: [Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]], encoding: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, errors: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, newline: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | TextIOWrapper, [None](https://docs.python.org/3/builtins/constants.html#None), [None](https://docs.python.org/3/builtins/constants.html#None)]
+### unzipwalk.recursive_open(fns: [Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]], encoding: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, errors: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, newline: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None) = None) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[IO](https://docs.python.org/3/library/typing.html#typing.IO)[[bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)] | TextIOWrapper, [None](https://docs.python.org/3/builtins/constants.html#None), [None](https://docs.python.org/3/builtins/constants.html#None)]
 
 This context manager allows opening files nested inside archives directly.
 
@@ -295,9 +296,12 @@ Hi, I'm a compressed file!
 
 ### *class* unzipwalk.ReadOnlyBinary(\*args, \*\*kwargs)
 
-Interface for the file handle (file object) used in [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
+Common readable interface for the file handles used in [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
 
-This is essentially the intersection of what the underlying objects support.
+This protocol is used for runtime validation. Returned handles are annotated as
+[`typing.IO`](https://docs.python.org/3/library/typing.html#typing.IO) with binary contents for compatibility with standard I/O utilities.
+The concrete stream depends on the compression format; attributes such as `name`
+are not available on every backend. Use [`UnzipWalkResult.raw_names`](#unzipwalk.UnzipWalkResult.raw_names) for filenames.
 
 #### close() → [None](https://docs.python.org/3/builtins/constants.html#None)
 

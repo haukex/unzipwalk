@@ -28,6 +28,9 @@ Changelog for unzipwalk
   instead of being processed as regular files.
 - Walking 7z archives now extracts selected files in a single pass to temporary storage,
   avoiding repeated decompression of earlier members in solid archives.
+- Returned binary handles are now annotated as `IO[bytes]` instead of `ReadOnlyBinary` so usage in
+  iteration and `TextIOWrapper` work with type checkers.
+  `ReadOnlyBinary` remains the runtime validation protocol and now includes iteration.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------
