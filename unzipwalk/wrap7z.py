@@ -113,7 +113,8 @@ class Wrap7Z:
     def recursive_open(a :RecursiveOpenArgs, recurse :RecursiveOpener) -> Generator[IO[bytes], None, None]:
         with py7zr.SevenZipFile(cast(BinaryIO, a.fh)) as sz:
             with Wrap7Z._read_one(sz, str(a.fns[1])) as bio:
-                with recurse(RecursiveOpenArgs(fns=a.fns[1:], fh=bio)) as inner:
+                # The following pragma seems to be needed on Python 3.14 - probably a bug in coverage.
+                with recurse(RecursiveOpenArgs(fns=a.fns[1:], fh=bio)) as inner:  # pragma: no branch
                     yield inner
 
     @staticmethod
