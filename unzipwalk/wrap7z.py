@@ -48,12 +48,20 @@ class Py7zBytesIO(py7zr.io.Py7zIO):  # pyright: ignore [reportUntypedBaseClass]
         return self._buffer.getbuffer().nbytes
 
 class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUntypedBaseClass]
-    def __init__(self) -> None:
+    def __init__(self, occurrence :Optional[int] = None) -> None:
         self._filename :Optional[str] = None
         self._buffer :Optional[BytesIO] = None
+        self._occurrence = occurrence
+        self._created = 0
     def create(self, filename :str) -> py7zr.io.Py7zIO:
+        # If there are multiple files of exactly the same name, then py7zr calls this factory
+        # method for each of the files. However, each _read_one() call needs one occurrence.
         if not isinstance(filename, str):  # pyright: ignore [reportUnnecessaryIsInstance]
             raise TypeError()
+        if self._occurrence is not None:
+            self._created += 1
+            if self._created != self._occurrence+1:
+                return py7zr.io.NullIO()
         if self._filename is not None or self._buffer is not None:
             raise FileExistsError(f"Attempt to create second file on this factory: {filename!r}")
         self._filename = filename
@@ -67,9 +75,9 @@ class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUn
 class Wrap7Z:
 
     @staticmethod
-    def _read_one(sz :py7zr.SevenZipFile, fn :str) -> BytesIO:
+    def _read_one(sz :py7zr.SevenZipFile, fn :str, occurrence :Optional[int] = None) -> BytesIO:
         """Read one file from a 7z archive as a BytesIO object."""
-        fact = SingleBytesIOFactory()
+        fact = SingleBytesIOFactory(occurrence)
         sz.reset()
         sz.extract(targets=[str(fn)], factory=fact)
         try:
@@ -88,24 +96,33 @@ class Wrap7Z:
         try:
             # The cast from IO[bytes] to BinaryIO should be ok here I think:
             with py7zr.SevenZipFile(cast(BinaryIO, a.fh)) as sz:
+                occurrences :dict[str, int] = {}
                 for f7 in sz.list():
+                    # `sz.list()` returns one FileInfo instance per archive entry, including for filenames that occur more than once.
+                    # But as noted in SingleBytesIOFactory, py7zr's extraction API will extract all files of the same name when requesting
+                    # extraction by filename, as we do here, so we also need to keep track of which of the occurrences we are requesting.
+                    occurrence = occurrences.get(f7.filename, 0)
+                    if not f7.is_directory:
+                        occurrences[f7.filename] = occurrence+1
                     new_names = (*a.fns, PurePosixPath(f7.filename))
-                    if a.ctx.matcher is not None and not a.ctx.matcher(new_names):
-                        yield UnzipWalkResult(names=new_names, typ=FileType.SKIP)
+                    new_raw = (*a.raw_names, f7.filename)
+                    if a.ctx.matcher is not None and not a.ctx.matcher(new_raw):
+                        yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.SKIP)
                     elif f7.is_directory:
-                        yield UnzipWalkResult(names=new_names, typ=FileType.DIR)
+                        yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.DIR)
                     else:
                         try:
-                            bio = Wrap7Z._read_one(sz, f7.filename)
+                            bio = Wrap7Z._read_one(sz, f7.filename, occurrence)
                         except Exception:  # pylint: disable=[duplicate-code]
                             if a.ctx.raise_errors:
                                 raise
-                            yield UnzipWalkResult(names=new_names, typ=FileType.ERROR)
+                            yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.ERROR)
                         else:
-                            yield from recurse(FileProcessorArgs(fns=new_names, fh=bio, size=f7.uncompressed, ctx=a.ctx))
+                            yield from recurse(FileProcessorArgs(
+                                fns=new_names, raw_names=new_raw, fh=bio, size=f7.uncompressed, ctx=a.ctx))
         except Exception:  # pylint: disable=[duplicate-code]
             if a.ctx.raise_errors:
                 raise
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ERROR)
+            yield UnzipWalkResult(names=a.fns, raw_names=a.raw_names, typ=FileType.ERROR)
         else:  # pylint: disable=[duplicate-code]
-            yield UnzipWalkResult(names=a.fns, typ=FileType.ARCHIVE, size=a.size)
+            yield UnzipWalkResult(names=a.fns, raw_names=a.raw_names, typ=FileType.ARCHIVE, size=a.size)

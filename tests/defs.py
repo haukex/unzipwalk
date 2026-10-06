@@ -34,7 +34,7 @@ from pathlib import PurePath, Path, PurePosixPath
 from igbpyutils.file import Pushd
 from unzipwalk import FileType, UnzipWalkResult
 
-# spell-checker: ignore linktest nlll Pushd mkfifo
+# spell-checker: ignore linktest nlll Pushd mkfifo blabla
 
 BAD_ZIPS = Path(__file__).parent.resolve()/'bad_zips'
 

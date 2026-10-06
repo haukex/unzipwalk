@@ -37,9 +37,9 @@ something as seemingly simple as `sorted(unzipwalk('.'))` would cause the code a
 because all files will have been opened and closed during the call to [`sorted()`](https://docs.python.org/3/builtins/functions.html#sorted)
 and the handles to read the data would no longer be available in the body of the loop.
 This is why the above example first processes all the files before sorting the results.
-You can also use [`recursive_open()`](#unzipwalk.recursive_open) to open the files later, though using that function
-is less efficient that [`unzipwalk()`](#function-unzipwalk) if you are opening multiple files inside of Zip
-or tar archives.
+You can also use [`recursive_open()`](#unzipwalk.recursive_open) with `result.raw_names` to open the files later,
+though using that function is less efficient that [`unzipwalk()`](#function-unzipwalk) if you are opening
+multiple files inside of Zip or tar archives.
 
 The yielded file handles can be wrapped in [`io.TextIOWrapper`](https://docs.python.org/3/library/io.html#io.TextIOWrapper) to read them as text files.
 For example, to read all CSV files in the current directory and below, including within compressed files:
@@ -77,7 +77,7 @@ Using the original filename from the gzip file’s header is currently not possi
 
 <a id="function-unzipwalk"></a>
 
-### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)] | [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)] | [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath)]], [bool](https://docs.python.org/3/builtins/functions.html#bool)] | [None](https://docs.python.org/3/builtins/constants.html#None) = None, raise_errors: [bool](https://docs.python.org/3/builtins/functions.html#bool) = True) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[UnzipWalkResult](#unzipwalk.UnzipWalkResult), [None](https://docs.python.org/3/builtins/constants.html#None), [None](https://docs.python.org/3/builtins/constants.html#None)]
+### unzipwalk.unzipwalk(paths: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)] | [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes) | [Iterable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[str](https://docs.python.org/3/builtins/stdtypes.html#str) | [PathLike](https://docs.python.org/3/library/os.html#os.PathLike)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)] | [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)], \*, matcher: [Callable](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable)[[[Sequence](https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]], [bool](https://docs.python.org/3/builtins/functions.html#bool)] | [None](https://docs.python.org/3/builtins/constants.html#None) = None, raise_errors: [bool](https://docs.python.org/3/builtins/functions.html#bool) = True) → [Generator](https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator)[[UnzipWalkResult](#unzipwalk.UnzipWalkResult), [None](https://docs.python.org/3/builtins/constants.html#None), [None](https://docs.python.org/3/builtins/constants.html#None)]
 
 This generator recursively walks into directories and compressed files and yields named tuples of type [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult).
 
@@ -85,18 +85,20 @@ This generator recursively walks into directories and compressed files and yield
   * **paths** – A filename or iterable of filenames.
   * **matcher** – 
 
-    When you provide this optional argument, it must be a callable that accepts a sequence of paths
-    as its only argument, and returns a boolean value whether this filename should be further processed or not.
+    When you provide this optional argument, it must be a callable that accepts a sequence of
+    filename strings corresponding to [`raw_names`](#unzipwalk.UnzipWalkResult.raw_names) as its only argument, and returns
+    a boolean value whether this filename should be further processed or not.
     If a file is skipped, a [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.SKIP`](#unzipwalk.FileType) is yielded.
 
     *Be aware* that within Zip and tar archives, all files are basically a flat list, so if your matcher
     excludes a directory inside an archive, it must also exclude all files within that directory as well.
     This behavior is different for physical directories in the file system: if you exclude a directory there,
     it will not be descended into, so you won’t have to exclude the files inside (though it’s good practice
-    to write your matcher to exclude them anyway - see for example [`is_relative_to()`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.is_relative_to)).
-  * **raise_errors** – When this is turned on (the default), any errors are raised immediately,
-    aborting the iteration. If this is turned off, when file access, directory traversal, or decompression errors occur, a
-    [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.ERROR`](#unzipwalk.FileType) is yielded for those files instead.
+    to write your matcher to exclude them anyway; for example, for physical paths, you can construct a
+    [`Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path) and use [`is_relative_to()`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.is_relative_to)).
+  * **raise_errors** – When this is turned on (the default), any errors are raised immediately, aborting the
+    iteration. If this is turned off, when file access, directory traversal, or decompression errors occur,
+    a [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.ERROR`](#unzipwalk.FileType) is yielded for those files instead.
 
 #### NOTE
 If [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is not installed, those archives will not be descended into.
@@ -104,6 +106,11 @@ If [`py7zr`](https://py7zr.readthedocs.io/en/stable/api.html#module-py7zr) is no
 #### NOTE
 Do not rely on the order of results! But see also the discussion in the main documentation about why
 e.g. `sorted(unzipwalk(...))` automatically closes files and so may not be what you want.
+
+#### NOTE
+Archive entries with identical names are yielded separately with their own file handles.
+[`recursive_open()`](#unzipwalk.recursive_open) cannot distinguish these occurrences after iteration, even when given
+[`raw_names`](#unzipwalk.UnzipWalkResult.raw_names).
 
 * **Raises:**
   [**Exception**](https://docs.python.org/3/builtins/exceptions.html#Exception) – Because of the various underlying libraries, both this function and [`recursive_open()`](#unzipwalk.recursive_open) can raise
@@ -119,7 +126,7 @@ exception handler around your `read()` call!
 
 <a id="unzipwalk.UnzipWalkResult"></a>
 
-### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, size: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None) = None)
+### *class* unzipwalk.UnzipWalkResult(names: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath), ...], raw_names: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...], typ: [FileType](#unzipwalk.FileType), hnd: [ReadOnlyBinary](#unzipwalk.ReadOnlyBinary) | [None](https://docs.python.org/3/builtins/constants.html#None) = None, size: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None) = None)
 
 Return type for [`unzipwalk()`](#function-unzipwalk).
 
@@ -127,7 +134,15 @@ Return type for [`unzipwalk()`](#function-unzipwalk).
 
 A tuple of the filename(s) as [`pathlib`](https://docs.python.org/3/library/pathlib.html#module-pathlib) objects. The first element is always the physical file in the file system.
 If the tuple has more than one element, then the yielded file is contained in a compressed file, possibly nested in
-other compressed file(s), and the last element of the tuple will contain the file’s actual name.
+other compressed file(s), and the last element of the tuple will contain the file’s normalized name. Note that
+[`Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path) objects normalize filenames, for example by removing `./` prefixes and repeated separators, and
+you can use [`raw_names`](#unzipwalk.UnzipWalkResult.raw_names) to access the exact archive member names, for example for use in [`recursive_open()`](#unzipwalk.recursive_open).
+
+#### raw_names *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+
+The filename sequence as strings, preserving archive member names exactly as reported by the archive library (though
+for gzip, bzip2, and lzma files, the extension is simply removed). Pass this sequence to [`recursive_open()`](#unzipwalk.recursive_open) to avoid
+path normalization. This field must have the same number of elements as [`names`](#unzipwalk.UnzipWalkResult.names).
 
 #### typ *: [FileType](#unzipwalk.FileType)*
 
@@ -164,6 +179,7 @@ Encodes this object into a line of text suitable for use as a checksum line.
 
 Intended mostly for internal use by the `--checksum` CLI option.
 See [`from_checksum_line()`](#unzipwalk.UnzipWalkResult.from_checksum_line) for the inverse operation.
+Uses [`raw_names`](#unzipwalk.UnzipWalkResult.raw_names) to preserve the exact spelling of archive member names.
 
 #### WARNING
 Requires that the file handle be open (for files), and will read from it to generate the checksum!
@@ -180,6 +196,7 @@ Requires that the file handle be open (for files), and will read from it to gene
 Decodes a checksum line as produced by [`checksum_line()`](#unzipwalk.UnzipWalkResult.checksum_line).
 
 Intended as a utility function for use when reading files produced by the `--checksum` CLI option.
+The filename strings are preserved in [`raw_names`](#unzipwalk.UnzipWalkResult.raw_names), alongside the normalized path objects in [`names`](#unzipwalk.UnzipWalkResult.names).
 
 #### WARNING
 The `hnd` of the returned object will *not* be a handle to
@@ -188,8 +205,8 @@ the data from the file, instead it will be a handle to read the checksum of the 
 
 * **Parameters:**
   * **line** – The line to parse.
-  * **windows** – Set this to [`True`](https://docs.python.org/3/builtins/constants.html#True) if the pathname in the line is in Windows format,
-    otherwise it is assumed the filename is in POSIX format.
+  * **windows** – Whether the physical pathname (and gzip, bzip2, or lzma paths derived from it) are in Windows format. Defaults
+    to the current platform. Archive member names always use POSIX path objects, including any files nested inside archives.
 * **Returns:**
   The [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) object, or [`None`](https://docs.python.org/3/builtins/constants.html#None) for empty or comment lines.
 * **Raises:**
@@ -239,7 +256,8 @@ An error was encountered with this file, when the `raise_errors` option is off.
 This context manager allows opening files nested inside archives directly.
 
 [`unzipwalk()`](#function-unzipwalk) automatically closes files as it iterates through directories and archives;
-this function exists to allow you to open the returned files after the iteration.
+this function exists to allow you to open the returned files after the iteration (using their
+[`raw_names`](#unzipwalk.UnzipWalkResult.raw_names)).
 However, this function will be less efficient that [`unzipwalk()`](#function-unzipwalk) if you’re opening
 multiple files inside of Zip or tar archives.
 
@@ -247,6 +265,17 @@ multiple files inside of Zip or tar archives.
 file is wrapped in :class:`io.TextIOWrapper`! -->
 <!-- note: If the last file in the list of files is an archive file, then it won't be decompressed,
 instead you'll be able to read the archive's raw compressed data from the handle. -->
+
+#### NOTE
+Strings used as archive member names are matched literally, including `./` prefixes and repeated
+separators. [`pathlib`](https://docs.python.org/3/library/pathlib.html#module-pathlib) objects introduce filename normalization and may therefore refer to a different
+member. Windows path objects used as archive member names are converted to POSIX format. Other path-like
+objects preserve the exact spelling returned by [`os.fspath()`](https://docs.python.org/3/library/os.html#os.fspath).
+
+#### WARNING
+If an archive contains multiple entries with exactly the same name, this function cannot select
+a particular occurrence. The underlying archive library determines which entry is returned, or may raise
+an error. Read each entry’s handle during [`unzipwalk()`](#function-unzipwalk) iteration to access its individual contents.
 
 In this example, we open a gzip-compressed file, stored inside a tgz archive, which
 in turn is stored in a Zip file:
@@ -322,12 +351,12 @@ options:
   -o OUTFILE, --outfile OUTFILE
                         output filename (must not already exist)
 
-* Note --exclude currently only matches against the final name in the
-sequence, excluding path names, but this interface may change in future
-versions. For more control, use the library instead of this command-line tool.
-** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1, ripemd160, sha1,
-sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512,
-sha512_224, sha512_256, shake_128, shake_256, sm3
+* Note --exclude matches the full final name in the sequence, including
+directory components. For archive members, this is the path within the
+innermost archive. For more control, use the library instead of this command-
+line tool. ** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1,
+ripemd160, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384,
+sha3_512, sha512, sha512_224, sha512_256, shake_128, shake_256, sm3
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.

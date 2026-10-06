@@ -63,7 +63,10 @@ class TestUnzipWalkCli(unittest.TestCase):
     def test_cli(self) -> None:
         expect :list[ExpectedResult]
         with TestCaseContext() as expect:
-            exp_basic = sorted( f"FILE {tuple(str(n) for n in e.fns)!r}" for e in expect if e.typ==FileType.FILE )
+            # ZIP directory entries retain their trailing slashes in raw names.
+            raw_names = [tuple(str(n) for n in e.fns[:-1]) + (str(e.fns[-1])
+                + ('/' if e.typ==FileType.DIR and len(e.fns)>1 and e.fns[-2].suffix.lower()=='.zip' else ''),) for e in expect]
+            exp_basic = sorted( f"FILE {names!r}" for e, names in zip(expect, raw_names) if e.typ==FileType.FILE )
             self.assertEqual( self._run_cli([]), exp_basic )  # basic
             with TemporaryDirectory() as td:  # --outfile
                 tf = Path(td)/'foo'
@@ -71,25 +74,58 @@ class TestUnzipWalkCli(unittest.TestCase):
                 with tf.open(encoding='UTF-8') as fh:
                     self.assertEqual( sorted(fh.read().splitlines()), exp_basic )
             self.assertEqual( self._run_cli(['--all-files']), sorted(  # basic + all-files
-                f"{e.typ.name} {tuple(str(n) for n in e.fns)!r}" for e in expect ) )
+                f"{e.typ.name} {names!r}" for e, names in zip(expect, raw_names) ) )
             self.assertEqual( self._run_cli(['--dump']), sorted(  # dump
-                f"FILE {tuple(str(n) for n in e.fns)!r} {e.data!r}" for e in expect if e.typ==FileType.FILE ) )
+                f"FILE {names!r} {e.data!r}" for e, names in zip(expect, raw_names) if e.typ==FileType.FILE ) )
             self.assertEqual( self._run_cli(['-da']), sorted(  # dump + all-files
-                f"FILE {tuple(str(n) for n in e.fns)!r} {e.data!r}" if e.typ==FileType.FILE
-                else f"{e.typ.name} {tuple(str(n) for n in e.fns)!r}" for e in expect ) )
+                f"FILE {names!r} {e.data!r}" if e.typ==FileType.FILE
+                else f"{e.typ.name} {names!r}" for e, names in zip(expect, raw_names) ) )
             self.assertEqual( self._run_cli(['--checksum','sha256']), sorted(  # checksum
-                f"{hashlib.sha256(e.data).hexdigest()} *{str(e.fns[0]) if len(e.fns)==1 else repr(tuple(str(n) for n in e.fns))}"
-                for e in expect if e.data is not None ) )
+                f"{hashlib.sha256(e.data).hexdigest()} *{names[0] if len(names)==1 else repr(names)}"
+                for e, names in zip(expect, raw_names) if e.data is not None ) )
             self.assertEqual( self._run_cli(['-a','-csha512']), sorted(  # checksum + all-files
                 (f"# {e.typ.name} " if e.data is None else f"{hashlib.sha512(e.data).hexdigest()} *")
-                + f"{str(e.fns[0]) if len(e.fns)==1 else repr(tuple(str(n) for n in e.fns))}"
-                for e in expect ) )
-            self.assertEqual( self._run_cli(['-e','world.*','--exclude=*abc*']), sorted(  # exclude
-                f"FILE {tuple(str(n) for n in e.fns)!r}" for e in expect if e.typ==FileType.FILE
+                + f"{names[0] if len(names)==1 else repr(names)}"
+                for e, names in zip(expect, raw_names) ) )
+            self.assertEqual( self._run_cli(['-e','*world.*','--exclude=*abc*']), sorted(  # exclude
+                f"FILE {names!r}" for e, names in zip(expect, raw_names) if e.typ==FileType.FILE
                 and not ( e.fns[-1].name.startswith('world.') or len(e.fns)>1 and e.fns[1].name=='abc.zip' ) ) )
+            self.assertEqual(self._run_cli(['--exclude', 'ooo.txt']), exp_basic)
+            self.assertEqual(self._run_cli(['--exclude', str(Path('subdir')/'ooo.txt')]), sorted(
+                f"FILE {names!r}" for e, names in zip(expect, raw_names)
+                if e.typ==FileType.FILE and e.fns[0]!=Path('subdir')/'ooo.txt'))
             self.assertEqual(self._run_cli(['--all-files', '--exclude', 'subdir']), sorted(
-                [f"{e.typ.name} {tuple(str(n) for n in e.fns)!r}" for e in expect
+                [f"{e.typ.name} {names!r}" for e, names in zip(expect, raw_names)
                     if not e.fns[0].is_relative_to(Path('subdir'))] + ["SKIP ('subdir',)"]))
+
+    def test_cli_raw_names(self) -> None:
+        with TemporaryDirectory() as td, Pushd(td):
+            files = (('./file.txt', b'dotted'), ('file.txt', b'first'), ('file.txt', b'second'), ('./dir//file.txt', b'nested'))
+            with ZipFile('archive.zip', 'w') as zf:
+                with self.assertWarnsRegex(UserWarning, 'Duplicate name'):
+                    for name, data in files:
+                        zf.writestr(name, data)
+                zf.writestr('./dir//', b'')
+                zf.writestr('./bad//invalid.zip', b'invalid')
+            for options, dump, all_files in (([], False, False), (['-a'], False, True), (['-d'], True, False), (['-da'], True, True)):
+                with self.subTest(options=options):
+                    expected = [f"FILE {('archive.zip', name)!r}" + (f" {data!r}" if dump else '') for name, data in files]
+                    expected.append("ERROR ('archive.zip', './bad//invalid.zip')")
+                    if all_files:
+                        expected.extend(["DIR ('archive.zip', './dir//')", "ARCHIVE ('archive.zip',)"])
+                    self.assertEqual(self._run_cli([*options, 'archive.zip']), sorted(expected))
+            self.assertEqual(self._run_cli(['-csha1', 'archive.zip']), sorted(
+                [f"{hashlib.sha1(data).hexdigest()} *{('archive.zip', name)!r}" for name, data in files]
+                + ["# ERROR ('archive.zip', './bad//invalid.zip')"]))
+            for pattern, included in (('./file.txt', files[1:]), ('file.txt', (files[0], files[-1])), ('./dir//*', files[:3])):
+                with self.subTest(pattern=pattern):
+                    self.assertEqual(self._run_cli(['--exclude', pattern, 'archive.zip']), sorted(
+                        [f"FILE {('archive.zip', name)!r}" for name, _ in included]
+                        + ["ERROR ('archive.zip', './bad//invalid.zip')"]))
+            self.assertEqual(self._run_cli(['-a', '--exclude', './dir//*', 'archive.zip']), sorted(
+                [f"FILE {('archive.zip', name)!r}" for name, _ in files[:3]] + [
+                    "ARCHIVE ('archive.zip',)", "ERROR ('archive.zip', './bad//invalid.zip')",
+                    "SKIP ('archive.zip', './dir//')", "SKIP ('archive.zip', './dir//file.txt')" ]))
 
     def test_cli_outfile(self) -> None:
         with TemporaryDirectory() as td, Pushd(td):
@@ -111,8 +147,8 @@ class TestUnzipWalkCli(unittest.TestCase):
                         f"{hashlib.sha256(b'archived').hexdigest()} *('archive.zip', 'output.txt')",
                         '# SKIP output.txt' ]) ):
                 with self.subTest(options=options):
-                    # The output path is absolute while traversal returns relative paths.
-                    self.assertEqual(self._run_cli([*options, '--outfile', str(Path(td)/'output.txt'), '.']), [])
+                    # The output path is absolute and contains a dot component while traversal returns relative paths.
+                    self.assertEqual(self._run_cli([*options, '--outfile', os.path.join(td, '.', 'output.txt'), '.']), [])
                     self.assertEqual(sorted(Path('output.txt').read_text(encoding='UTF-8').splitlines()), sorted(expected))
                     Path('output.txt').unlink()
             self.assertEqual(self._run_cli(['--outfile', '-', 'input.txt']), ["FILE ('input.txt',)"])
@@ -141,8 +177,8 @@ class TestUnzipWalkCli(unittest.TestCase):
             #"ERROR ('bad.tar.gz', 'b')",
             #"FILE ('bad.tar.gz', 'c') b'Three\\n'",
             "ERROR ('bad.7z', 'broken.txt')",
-            "ERROR ('double.7z', 'bar.txt')",
-            "ERROR ('double.7z', 'bar.txt')",
+            "FILE ('double.7z', 'bar.txt') b''",
+            "FILE ('double.7z', 'bar.txt') b''",
             "ERROR ('not_a.7z',)",
         ] ) )
         self.assertEqual( self._run_cli(['-cmd5','.','does_not_exist']), sorted( [
@@ -168,8 +204,8 @@ class TestUnzipWalkCli(unittest.TestCase):
             #"38a460ffb4cfb15460b4b679ce534181 *('bad.tar.gz', 'c')",
             "# ERROR not_a.7z",
             "# ERROR ('bad.7z', 'broken.txt')",
-            "# ERROR ('double.7z', 'bar.txt')",
-            "# ERROR ('double.7z', 'bar.txt')",
+            "d41d8cd98f00b204e9800998ecf8427e *('double.7z', 'bar.txt')",
+            "d41d8cd98f00b204e9800998ecf8427e *('double.7z', 'bar.txt')",
         ] ) )
         with self.assertRaises(BadGzipFile):
             self._run_cli(['-rd','not_a.gz'])

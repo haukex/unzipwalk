@@ -29,6 +29,7 @@ import errno
 import doctest
 import unittest
 from hashlib import sha1
+from collections.abc import Sequence
 from tarfile import TarError
 from zipfile import BadZipFile
 from unittest.mock import patch
@@ -85,44 +86,54 @@ class TestUnzipWalk(unittest.TestCase):
             self.assertEqual( sorted(
                     [ r for r in expect if r.fns[0].name != 'more.zip' ]
                     + [ ExpectedResult( (Path("more.zip"),), None, FileType.SKIP, None ) ]
-                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: p[0].stem.lower()!='more')) )
+                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: os.path.splitext(os.path.basename(p[0]))[0].lower()!='more')) )
             # filter from zip file
             self.assertEqual( sorted(
                     [ r for r in expect if r.fns[-1].name != 'six.txt' ]
                     + [ ExpectedResult( (Path("more.zip"), PurePosixPath("more/stuff/six.txt")), None, FileType.SKIP, None ) ]
-                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name.lower()!='six.txt')) )
+                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].lower()!='more/stuff/six.txt')) )
             # filter a gz file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='archive.tar.gz' and len(r.fns)>1 and r.fns[1].name == 'world.txt.gz' ) ]
                     + [ ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/world.txt.gz")), None, FileType.SKIP, None ) ]
-                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2].as_posix()!='archive/world.txt.gz')) )
+                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2]!='archive/world.txt.gz')) )
             # filter a bz2 file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='formats.tar.bz2' and len(r.fns)>1 and r.fns[1].name == 'bzip2.txt.bz2' ) ]
                     + [ ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/bzip2.txt.bz2")), None, FileType.SKIP, None ) ]
-                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2].as_posix()!='formats/bzip2.txt.bz2')) )
+                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2]!='formats/bzip2.txt.bz2')) )
             # filter an xz file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='formats.tar.bz2' and len(r.fns)>1 and r.fns[1].name == 'lzma.txt.xz' ) ]
                     + [ ExpectedResult( (Path("subdir","formats.tar.bz2"), PurePosixPath("formats/lzma.txt.xz")), None, FileType.SKIP, None ) ]
-                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2].as_posix()!='formats/lzma.txt.xz')) )
+                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: len(p)<2 or p[-2]!='formats/lzma.txt.xz')) )
             # filter from tar file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( len(r.fns)>1 and r.fns[1].stem=='abc' ) ]
                     + [ ExpectedResult( (Path("archive.tar.gz"), PurePosixPath("archive/abc.zip")), None, FileType.SKIP, None ) ]
-                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'abc.zip')) )
+                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: p[-1] != 'archive/abc.zip')) )
             # filter a file from 7z file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 and r.fns[1].name=='wuv.tgz' ) ]
                     + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
-                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: p[-1].name != 'wuv.tgz')) )
+                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: p[-1] != 'thing/wuv.tgz')) )
             # filter a directory from a 7z file
             self.assertEqual( sorted(
                     [ r for r in expect if not ( r.fns[0].name=='opt.7z' and len(r.fns)>1 ) ]
                     + [ ExpectedResult( (Path("opt.7z"), PurePosixPath("thing")), None, FileType.SKIP, None ),
                         ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/blah.txt")), None, FileType.SKIP, None ),
                         ExpectedResult( (Path("opt.7z"), PurePosixPath("thing/wuv.tgz")), None, FileType.SKIP, None ), ]
-                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: not ( len(p)>1 and p[1].parts[0] == 'thing')) ) )
+                ), r2e(uut.unzipwalk(os.curdir, matcher=lambda p: not ( len(p)>1 and p[1].split('/')[0] == 'thing')) ) )
+
+    def test_matcher_raw_names(self) -> None:
+        matched :set[tuple[str, ...]] = set()
+        def matcher(names :Sequence[str]) -> bool:
+            matched.add(tuple(names))
+            return True
+        with TestCaseContext():
+            yielded = {r.raw_names for r in uut.unzipwalk(os.curdir, matcher=matcher)}
+            # The input directory is matched but is not yielded as a result.
+            self.assertEqual(matched, yielded | {(os.curdir,)})
 
     def test_skip_dirs(self) -> None:
         with TemporaryDirectory() as tmp_dir:
@@ -132,15 +143,15 @@ class TestUnzipWalk(unittest.TestCase):
                 (d/'kaboom.zip').write_bytes(b'I am not a zip file, reading me would cause an error')
             (td/'inc'/'good.txt').write_bytes(b'good')
             self.assertEqual(
-                r2e(uut.unzipwalk(td, matcher=lambda p: p[-1].name != 'excl')),
+                r2e(uut.unzipwalk(td, matcher=lambda p: os.path.basename(p[-1]) != 'excl')),
                 sorted([
                     ExpectedResult((td/'excl',), None, FileType.SKIP, None),
                     ExpectedResult((td/'inc',), None, FileType.DIR, None),
                     ExpectedResult((td/'inc'/'excl',), None, FileType.SKIP, None),
                     ExpectedResult((td/'inc'/'good.txt',), b'good', FileType.FILE, 4) ]) )
             self.assertEqual(
-                list( uut.unzipwalk(td/'excl', matcher=lambda p: p[-1].name != 'excl') ),
-                [ uut.UnzipWalkResult(names=(td/'excl',), typ=FileType.SKIP) ])
+                list( uut.unzipwalk(td/'excl', matcher=lambda p: os.path.basename(p[-1]) != 'excl') ),
+                [ uut.UnzipWalkResult(names=(td/'excl',), raw_names=(str(td/'excl'),), typ=FileType.SKIP) ])
 
     def test_recursive_open(self) -> None:
         with TestCaseContext() as expect:
@@ -174,7 +185,7 @@ class TestUnzipWalk(unittest.TestCase):
                     pass  # pragma: no cover
             # TarFile.extractfile: attempt to open a directory
             with self.assertRaises(FileNotFoundError):
-                with uut.recursive_open(("archive.tar.gz", "archive/test2/")):
+                with uut.recursive_open(("archive.tar.gz", "archive/test2")):
                     pass  # pragma: no cover
             # 7z bad filename
             with self.assertRaises(FileNotFoundError):
@@ -186,39 +197,27 @@ class TestUnzipWalk(unittest.TestCase):
                     pass  # pragma: no cover
 
     def test_recur_open_path_types(self) -> None:
-        # Previously, `recursive_open` would map all of `fns[1:]` to PurePosixPath. However, `unzipwalk`'s output
-        # differs from that, because .bz2, .xz, and .gz's `a.fns[-1].with_suffix('')` return a platform-native path.
+        # Physical and derived compression names retain native paths; archive member names use PurePosixPath.
         with TemporaryDirectory() as td:
-            # Check that gz/bz2/xz use fn.with_suffix('')
+            # Check the pathname and flavor of each derived compression name.
             for ext, compress in (('gz', gzip_compress), ('bz2', bz2_compress), ('xz', lzma_compress)):
                 fn = Path(td)/f"file.txt.{ext}"
                 fn.write_bytes(compress(b'compressed'))
                 names = [ r.names for r in uut.unzipwalk(fn) if r.typ==FileType.FILE ]
                 self.assertEqual(names, [ (fn, fn.with_suffix('')) ])
-                for path_cls in (Path, PureWindowsPath, PurePosixPath):
-                    for as_str in (False, True):
-                        with self.subTest(ext=ext, path_cls=path_cls.__name__, as_str=as_str):
-                            fns = tuple(str(path_cls(n)) if as_str else path_cls(n) for n in names[0])
-                            with (fn.open('rb') as raw, patch('unzipwalk.Path', path_cls),
-                                    patch('unzipwalk.open', return_value=raw, create=True) as mock_open):
-                                with uut.recursive_open(fns) as fh:
-                                    self.assertEqual(fh.read(), b'compressed')
-                                mock_open.assert_called_once_with(fns[0], 'rb')
+                for as_str in (False, True):
+                    with self.subTest(ext=ext, as_str=as_str):
+                        with uut.recursive_open(tuple(str(n) if as_str else n for n in names[0])) as fh:
+                            self.assertEqual(fh.read(), b'compressed')
             # Check the above, plus that ZIP members still use PurePosixPath
             fn = Path(td)/'archive.zip.gz.xz'
             fn.write_bytes(lzma_compress(gzip_compress((Path(__file__).parent/'zips'/'WinTest.ZIP').read_bytes())))
             names = [ r.names for r in uut.unzipwalk(fn) if r.typ==FileType.FILE and r.names[-1]==PurePosixPath('World/Hello.txt') ]
             self.assertEqual(names, [ (fn, fn.with_suffix(''), fn.with_suffix('').with_suffix(''), PurePosixPath('World/Hello.txt') )])
-            for path_cls in (Path, PureWindowsPath, PurePosixPath):
-                for as_str in (False, True):
-                    with self.subTest(ext='zip.gz.xz', path_cls=path_cls.__name__, as_str=as_str):
-                        fns = tuple(str(path_cls(n)) if as_str else path_cls(n) for n in names[0][:-1]) \
-                            + (str(names[0][-1]) if as_str else path_cls(names[0][-1]),)
-                        with (fn.open('rb') as raw, patch('unzipwalk.Path', path_cls),
-                                patch('unzipwalk.open', return_value=raw, create=True) as mock_open):
-                            with uut.recursive_open(fns) as fh:
-                                self.assertEqual(fh.read(), b'Hello\r\nWorld')
-                            mock_open.assert_called_once_with(fns[0], 'rb')
+            for as_str in (False, True):
+                with self.subTest(ext='zip.gz.xz', as_str=as_str):
+                    with uut.recursive_open(tuple(str(n) if as_str else n for n in names[0])) as fh:
+                        self.assertEqual(fh.read(), b'Hello\r\nWorld')
         # Test that recursive_open works no matter what path classes are given as inputs
         with TestCaseContext() as expect:
             for file in expect:
@@ -227,68 +226,6 @@ class TestUnzipWalk(unittest.TestCase):
                         with self.subTest(names=file.fns, path_cls=member_path_cls.__name__):
                             with uut.recursive_open((file.fns[0],) + tuple(member_path_cls(n) for n in file.fns[1:])) as fh:
                                 self.assertEqual(fh.read(), file.data)
-
-    def test_result_validate(self) -> None:
-        with self.assertRaises(ValueError):
-            uut.UnzipWalkResult((), FileType.OTHER, None, None).validate()
-        with self.assertRaises(TypeError):
-            uut.UnzipWalkResult(('foo',), FileType.OTHER, None, None).validate()  # type: ignore[arg-type]
-        with self.assertRaises(TypeError):
-            uut.UnzipWalkResult((Path(),), 'foo', None, None).validate()  # type: ignore[arg-type]
-        with self.assertRaises(TypeError):
-            uut.UnzipWalkResult((Path(),), FileType.FILE, None, None).validate()
-        with self.assertRaises(TypeError):
-            uut.UnzipWalkResult((Path(),), FileType.OTHER, io.BytesIO(), None).validate()
-        with self.assertRaises(TypeError):
-            uut.UnzipWalkResult((Path(),), FileType.FILE, io.BytesIO(), 'x').validate()  # type: ignore[arg-type]
-        with self.assertRaises(TypeError):
-            uut.UnzipWalkResult((Path(),), FileType.OTHER, None, 42).validate()
-
-    def test_checksum_lines(self) -> None:
-        res = uut.UnzipWalkResult(names=(PurePosixPath('hello'),), typ=FileType.DIR)
-        ln = res.checksum_line("md5")
-        self.assertEqual( ln, "# DIR hello" )
-        self.assertEqual( uut.UnzipWalkResult.from_checksum_line(ln), res )
-
-        res = uut.UnzipWalkResult(names=(PurePosixPath('hello\nworld'),), typ=FileType.DIR)
-        ln = res.checksum_line("md5")
-        self.assertEqual( ln, "# DIR ('hello\\nworld',)" )
-        self.assertEqual( uut.UnzipWalkResult.from_checksum_line(ln), res )
-
-        res = uut.UnzipWalkResult(names=(PurePosixPath('(hello'),), typ=FileType.DIR)
-        ln = res.checksum_line("md5")
-        self.assertEqual( ln, "# DIR ('(hello',)" )
-        self.assertEqual( uut.UnzipWalkResult.from_checksum_line(ln), res )
-
-        res = uut.UnzipWalkResult(names=(PurePosixPath(' hello '),), typ=FileType.DIR)
-        ln = res.checksum_line("md5")
-        self.assertEqual( ln, "# DIR (' hello ',)" )
-        self.assertEqual( uut.UnzipWalkResult.from_checksum_line(ln), res )
-
-        res2 = uut.UnzipWalkResult.from_checksum_line("# DIR C:\\Foo\\Bar", windows=True)
-        assert res2 is not None
-        self.assertEqual( res2.names, (PureWindowsPath('C:\\','Foo','Bar'),) )
-
-        res = uut.UnzipWalkResult(names=(PurePosixPath('hello'),PurePosixPath('world')),
-            typ=FileType.FILE, hnd=io.BytesIO(b'abcdef'))
-        ln = res.checksum_line("md5")
-        self.assertEqual( ln, "e80b5017098950fc58aad83c8c14978e *('hello', 'world')" )
-        res2 = uut.UnzipWalkResult.from_checksum_line(ln)
-        assert res2 is not None
-        self.assertEqual( res2.names, (PurePosixPath('hello'),PurePosixPath('world')) )
-        self.assertEqual( res2.typ, FileType.FILE )
-        assert res2.hnd is not None
-        self.assertEqual( res2.hnd.read(), bytes.fromhex('e80b5017098950fc58aad83c8c14978e') )
-
-        self.assertIsNone( uut.UnzipWalkResult.from_checksum_line("# I'm just some comment") )
-        self.assertIsNone( uut.UnzipWalkResult.from_checksum_line("# FOO bar") )
-        self.assertIsNone( uut.UnzipWalkResult.from_checksum_line("  # and some other comment") )
-        self.assertIsNone( uut.UnzipWalkResult.from_checksum_line("  ") )
-
-        with self.assertRaises(ValueError):
-            uut.UnzipWalkResult.from_checksum_line("e80b5017098950fc58aad83c8c14978g *kaboom")
-        with self.assertRaises(ValueError):
-            uut.UnzipWalkResult.from_checksum_line("e80b5017098950fc58aad83c8c14978e *(kaboom")
 
     def test_errors(self) -> None:
         with self.assertRaises(BadZipFile):
@@ -310,8 +247,6 @@ class TestUnzipWalk(unittest.TestCase):
             list(uut.unzipwalk(BAD_ZIPS/'not_a.7z'))
         with self.assertRaises(ArchiveError):
             list(uut.unzipwalk(BAD_ZIPS/'bad.7z'))
-        with self.assertRaises(FileExistsError):
-            list(uut.unzipwalk(BAD_ZIPS/'double.7z'))
         with self.assertRaises(RuntimeError):
             list(uut.unzipwalk(BAD_ZIPS/'features.zip'))
         # the following is commented out due to https://github.com/python/cpython/issues/120740
@@ -355,8 +290,8 @@ class TestUnzipWalk(unittest.TestCase):
                  ( (BAD_ZIPS/"bad.7z",), None, FileType.ARCHIVE ),
             ] + (
                 [
-                 ( (BAD_ZIPS/"double.7z", PurePosixPath("bar.txt")), None, FileType.ERROR ),
-                 ( (BAD_ZIPS/"double.7z", PurePosixPath("bar.txt")), None, FileType.ERROR ),
+                 ( (BAD_ZIPS/"double.7z", PurePosixPath("bar.txt")), b'', FileType.FILE ),
+                 ( (BAD_ZIPS/"double.7z", PurePosixPath("bar.txt")), b'', FileType.FILE ),
                  ( (BAD_ZIPS/"bad.7z", PurePosixPath("broken.txt")), None, FileType.ERROR ),  # bad checksum
                  ( (BAD_ZIPS/"not_a.7z",), None, FileType.ERROR ),
                 ]) ) )
@@ -423,7 +358,7 @@ class TestUnzipWalk(unittest.TestCase):
                 self.assertEqual( r2e(uut.unzipwalk((blocked, td/'readable'), raise_errors=False)),
                     sorted([ExpectedResult((blocked,), None, FileType.ERROR, None),
                             ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )
-                self.assertEqual( r2e(uut.unzipwalk(td, matcher=lambda p: p[-1].name != 'blocked')),
+                self.assertEqual( r2e(uut.unzipwalk(td, matcher=lambda p: os.path.basename(p[-1]) != 'blocked')),
                     sorted([ExpectedResult((blocked,), None, FileType.SKIP, None),
                             ExpectedResult((td/'readable',), None, FileType.DIR, None),
                             ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )

@@ -23,14 +23,19 @@ You should have received a copy of the GNU Lesser General Public License
 along with this program. If not, see https://www.gnu.org/licenses/
 """
 import io
+import os
 import re
 import enum
 import hashlib
+import posixpath
 from contextlib import AbstractContextManager
 from collections.abc import Callable, Sequence, Generator
-from pathlib import PurePosixPath, PurePath, PureWindowsPath
-from typing import Optional, Protocol, NamedTuple, runtime_checkable, IO
+from pathlib import Path, PurePosixPath, PurePath, PureWindowsPath
+from typing import Optional, Protocol, NamedTuple, runtime_checkable, IO, Union, TypeVar, overload
+from igbpyutils.file import Filename
 from .utils import decode_tuple
+
+# spell: ignore fspath
 
 class FileType(enum.IntEnum):
     """Used in :class:`UnzipWalkResult` to indicate the type of the file.
@@ -80,13 +85,52 @@ class ReadOnlyBinary(Protocol):  # pragma: no cover  (b/c Protocol class)
 
 CHECKSUM_LINE_RE = re.compile(r'^([0-9a-f]+) \*(.+)$')
 CHECKSUM_COMMENT_RE = re.compile(r'^# ([A-Z]+) (.+)$')
+TARFILE_RE = re.compile(r'\.(?:tar(?:\.gz|\.bz2|\.xz)?|tgz|txz|tbz2?)\Z', re.I)
+
+_ArchiveName = TypeVar('_ArchiveName', bound=Union[PurePath, str])
+def convert_names(fns :Sequence[Filename], physical_cls :type[PurePath], archive_name :Callable[[Filename], _ArchiveName]) \
+        -> tuple[Union[PurePath, _ArchiveName], ...]:
+    """Convert a sequence of path names in the same way as it would be returned by :func:`unzipwalk`.
+
+    Physical path names as well as filenames derived directly from them (gz/xz/bz2) are os-native,
+    while path names inside archives are typically POSIX paths. """
+    names :list[Union[PurePath, _ArchiveName]] = []
+    in_archive = False
+    for fn in fns:
+        name = archive_name(fn) if in_archive else physical_cls(fn)
+        names.append(name)
+        if not in_archive:
+            nl = str(name).lower()
+            if TARFILE_RE.search(nl) or nl.endswith(('.zip', '.7z')):
+                in_archive = True
+    return tuple(names)
+
+@overload
+def compression_stem(name :str, *, physical :bool = False) -> str: ...
+@overload
+def compression_stem(name :PurePath, *, physical :bool = False) -> PurePath: ...
+def compression_stem(name :Union[str, PurePath], *, physical :bool = False) -> Union[str, PurePath]:
+    """Remove a compression suffix, preserving literal strings and the flavor of normalized path objects."""
+    path = os.path if physical or isinstance(name, Path) else posixpath
+    filename = os.fspath(name)
+    stem, suffix = path.splitext(filename)
+    # splitext ignores all leading dots; preserve suffix removal for names such as '..gz'.
+    if not suffix and path.basename(filename).rfind('.') > 0:
+        stem = filename[:filename.rfind('.')]
+    return type(name)(stem) if isinstance(name, PurePath) else stem
 
 class UnzipWalkResult(NamedTuple):
     """Return type for :func:`unzipwalk`."""
     #: A tuple of the filename(s) as :mod:`pathlib` objects. The first element is always the physical file in the file system.
     #: If the tuple has more than one element, then the yielded file is contained in a compressed file, possibly nested in
-    #: other compressed file(s), and the last element of the tuple will contain the file's actual name.
+    #: other compressed file(s), and the last element of the tuple will contain the file's normalized name. Note that
+    #: :class:`~pathlib.Path` objects normalize filenames, for example by removing ``./`` prefixes and repeated separators, and
+    #: you can use :attr:`raw_names` to access the exact archive member names, for example for use in :func:`recursive_open`.
     names :tuple[PurePath, ...]
+    #: The filename sequence as strings, preserving archive member names exactly as reported by the archive library (though
+    #: for gzip, bzip2, and lzma files, the extension is simply removed). Pass this sequence to :func:`recursive_open` to avoid
+    #: path normalization. This field must have the same number of elements as :attr:`names`.
+    raw_names :tuple[str, ...]
     #: A :class:`FileType` value representing the type of the current file.
     typ :FileType
     #: When :attr:`typ` is :class:`FileType.FILE<FileType>`, this is a :class:`ReadOnlyBinary` file handle (file object)
@@ -110,6 +154,10 @@ class UnzipWalkResult(NamedTuple):
             raise ValueError('names is empty')
         if not all( isinstance(n, PurePath) for n in self.names ):  # pyright: ignore [reportUnnecessaryIsInstance]
             raise TypeError(f"invalid names {self.names!r}")
+        if len(self.raw_names) != len(self.names):
+            raise ValueError('raw_names and names have different lengths')
+        if not all( isinstance(n, str) for n in self.raw_names ):  # pyright: ignore [reportUnnecessaryIsInstance]
+            raise TypeError(f"invalid raw_names {self.raw_names!r}")
         if not isinstance(self.typ, FileType):  # pyright: ignore [reportUnnecessaryIsInstance]
             raise TypeError(f"invalid type {self.typ!r}")
         if self.typ==FileType.FILE and not isinstance(self.hnd, ReadOnlyBinary):
@@ -127,13 +175,14 @@ class UnzipWalkResult(NamedTuple):
 
         Intended mostly for internal use by the ``--checksum`` CLI option.
         See :meth:`from_checksum_line` for the inverse operation.
+        Uses :attr:`raw_names` to preserve the exact spelling of archive member names.
 
         .. warning:: Requires that the file handle be open (for files), and will read from it to generate the checksum!
 
         :param hash_algo: The hashing algorithm to use, as recognized by :func:`hashlib.new`.
         :return: The checksum line, without trailing newline.
         """
-        names = tuple( str(n) for n in self.names )
+        names = self.raw_names
         if len(names)==1 and names[0] and names[0].strip()==names[0] and not names[0].startswith('(') \
                 and '\n' not in names[0] and '\r' not in names[0]:  # pylint: disable=too-many-boolean-expressions
             name = names[0]
@@ -154,39 +203,40 @@ class UnzipWalkResult(NamedTuple):
         return f"# {self.typ.name} {name}"
 
     @classmethod
-    def from_checksum_line(cls, line :str, *, windows :bool=False) -> Optional['UnzipWalkResult']:
+    def from_checksum_line(cls, line :str, *, windows :bool = os.name=='nt') -> Optional['UnzipWalkResult']:
         """Decodes a checksum line as produced by :meth:`checksum_line`.
 
         Intended as a utility function for use when reading files produced by the ``--checksum`` CLI option.
+        The filename strings are preserved in :attr:`raw_names`, alongside the normalized path objects in :attr:`names`.
 
         .. warning:: The ``hnd`` of the returned object will *not* be a handle to
             the data from the file, instead it will be a handle to read the checksum of the file!
             (You could use :func:`recursive_open` to open the files themselves.)
 
         :param line: The line to parse.
-        :param windows: Set this to :obj:`True` if the pathname in the line is in Windows format,
-            otherwise it is assumed the filename is in POSIX format.
+        :param windows: Whether the physical pathname (and gzip, bzip2, or lzma paths derived from it) are in Windows format. Defaults
+            to the current platform. Archive member names always use POSIX path objects, including any files nested inside archives.
         :return: The :class:`UnzipWalkResult` object, or :obj:`None` for empty or comment lines.
         :raises ValueError: If the line could not be parsed.
         """
         if not line.strip():
             return None
-        path_cls = PureWindowsPath if windows else PurePosixPath
-        def mk_names(name :str)-> tuple[PurePath, ...]:
-            names = decode_tuple(name) if name.startswith('(') else (name,)
-            return tuple(path_cls(p) for p in names)
+        def mk_result(name :str, typ :FileType, hnd :Optional[ReadOnlyBinary] = None) -> 'UnzipWalkResult':
+            raw_names = decode_tuple(name) if name.startswith('(') else (name,)
+            return cls(names=convert_names(raw_names, PureWindowsPath if windows else PurePosixPath, PurePosixPath),
+                raw_names=raw_names, typ=typ, hnd=hnd)
         if line.lstrip().startswith('#'):  # comment, be lenient to allow user comments
             if m := CHECKSUM_COMMENT_RE.match(line):
                 if m.group(1) in FileType.__members__:
-                    return cls( names=mk_names(m.group(2)), typ=FileType[m.group(1)] )
+                    return mk_result(m.group(2), FileType[m.group(1)])
             return None
         if m := CHECKSUM_LINE_RE.match(line):
-            return cls( names=mk_names(m.group(2)), typ=FileType.FILE, hnd=io.BytesIO(bytes.fromhex(m.group(1))) )
+            return mk_result(m.group(2), FileType.FILE, io.BytesIO(bytes.fromhex(m.group(1))))
         raise ValueError(f"failed to decode checksum line {line!r}")
 
 # internal types:
 
-FilterType = Callable[[Sequence[PurePath]], bool]
+FilterType = Callable[[Sequence[str]], bool]
 
 class ProcessCallContext(NamedTuple):
     matcher :Optional[FilterType]
@@ -195,13 +245,14 @@ class ProcessCallContext(NamedTuple):
 class FileProcessorArgs(NamedTuple):
     ctx :ProcessCallContext
     fns :tuple[PurePath, ...]
+    raw_names :tuple[str, ...]
     fh :IO[bytes]
     size :Optional[int]
 
 FileProcessor = Callable[[FileProcessorArgs], Generator[UnzipWalkResult, None, None]]
 
 class RecursiveOpenArgs(NamedTuple):
-    fns :tuple[PurePath, ...]
+    fns :tuple[Union[PurePath, str], ...]
     fh :IO[bytes]
 
 RecursiveOpener = Callable[[RecursiveOpenArgs], AbstractContextManager[IO[bytes]]]

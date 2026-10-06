@@ -23,10 +23,10 @@ details.
 You should have received a copy of the GNU Lesser General Public License
 along with this program. If not, see https://www.gnu.org/licenses/
 """
+import os
 import hashlib
 import argparse
 from fnmatch import fnmatch
-from pathlib import PurePath, Path
 from collections.abc import Sequence
 from igbpyutils.file import open_out
 import igbpyutils.error
@@ -34,8 +34,9 @@ from . import unzipwalk, FileType
 
 def _arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser('unzipwalk', description='Recursively walk into directories and archives',
-        epilog="* Note --exclude currently only matches against the final name in the sequence, excluding path names, "
-        "but this interface may change in future versions. For more control, use the library instead of this command-line tool.\n\n"
+        epilog="* Note --exclude matches the full final name in the sequence, including directory components. "
+        "For archive members, this is the path within the innermost archive. "
+        "For more control, use the library instead of this command-line tool.\n\n"
         f"** Possible values for ALGO: {', '.join(sorted(hashlib.algorithms_available))}")
     parser.add_argument('-a','--all-files', help="also list dirs, symlinks, etc.", action="store_true")
     group = parser.add_mutually_exclusive_group()
@@ -51,19 +52,19 @@ def main(argv :Sequence[str]|None = None) -> None:
     igbpyutils.error.init_handlers()
     parser = _arg_parser()
     args = parser.parse_args(argv)
-    outfile = Path(args.outfile) if args.outfile and args.outfile != '-' else None
-    def matcher(paths :Sequence[PurePath]) -> bool:
-        if outfile is not None and len(paths)==1 and Path(paths[0]).samefile(outfile):
+    outfile = args.outfile if args.outfile and args.outfile != '-' else None
+    def matcher(names :Sequence[str]) -> bool:
+        if outfile is not None and len(names)==1 and os.path.samefile(names[0], outfile):
             return False  # skip the output file if we're using one
-        return not any( fnmatch(paths[-1].name, pat) for pat in args.exclude )
+        return not any( fnmatch(names[-1], pat) for pat in args.exclude )
     report = (FileType.FILE, FileType.ERROR)
     with open_out(args.outfile, mode='x') as fh:
-        for result in unzipwalk( args.paths if args.paths else Path(), matcher=matcher, raise_errors=args.raise_errors ):
+        for result in unzipwalk( args.paths if args.paths else os.curdir, matcher=matcher, raise_errors=args.raise_errors ):
             if args.checksum:
                 if result.typ in report or args.all_files:
                     print(result.checksum_line(args.checksum, raise_errors=args.raise_errors), file=fh)
             else:
-                names = tuple( str(n) for n in result.names )
+                names = result.raw_names
                 if result.typ == FileType.FILE and args.dump:
                     assert result.hnd is not None, result
                     try:

@@ -1,16 +1,27 @@
 Changelog for unzipwalk
 =======================
 
-1.9.3 - *not yet released*
+2.0.0 - *not yet released*
 ------------------------
 
+- **Possibly incompatible API change:** Added `UnzipWalkResult.raw_names` to preserve exact archive
+  member names; `UnzipWalkResult` is therefore now a 5-tuple `(names, raw_names, typ, hnd, size)`.
+  This was necessary because `pathlib` objects, as they are used in `names`, do some basic
+  normalization, for example if an archive has a member named exactly `./file.txt`, `pathlib`
+  normalizes this to `file.txt`, and so `recursive_open` can no longer open it. `raw_names` is now
+  used in more places, such as in "matchers" and in the CLI.
+  - CLI `--exclude` now matches the full final raw name, including directory components, instead of
+    only the basename. For archive members, this is the path within the innermost archive.
+  - `recursive_open` was overhauled in terms of its pathname handling in general.
 - Improved CLI `--outfile` handling: It can no longer clobber existing files, and if the output is
   in the input files, it is skipped automatically.
 - Fixed physical directory exclusions in `matcher` and CLI `--exclude`: excluded directories are
   no longer descended into, including directories passed as input paths.
 - Directory traversal errors now respect `raise_errors`: they are raised by default, or when
   `raise_errors=False`, they are reported as `ERROR` results and traversal continues.
-- Fixed path type handling in `recursive_open`.
+- `from_checksum_line` now defaults to the current platform's pathname format. Its `windows`
+  argument affects the physical pathname and derived compression paths.
+- Duplicate names in 7z archives are now yielded as separate results with their individual contents.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------
@@ -114,3 +125,5 @@ Changelog for unzipwalk
   - **WARNING: Incompatible Changes**
     - The `onlyfiles` argument of the `unzipwalk` function was removed and its return type has changed!
     - The output of the `unzipwalk` command line-tool has changed!
+
+<!-- spell: ignore onlyfiles pathlib -->
