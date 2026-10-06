@@ -25,6 +25,7 @@ along with this program. If not, see https://www.gnu.org/licenses/
 from typing import Union, Optional, cast, BinaryIO, IO
 from collections.abc import Generator
 from pathlib import PurePosixPath
+from contextlib import ExitStack
 from io import BytesIO
 # If py7zr isn't available, the following line will raise an exception, causing the imports following it to not be executed.
 import py7zr     # pylint: disable=import-error,useless-suppression  # pyright: ignore [reportMissingImports]
@@ -71,25 +72,34 @@ class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUn
         if self._filename is None or self._buffer is None:
             raise FileNotFoundError
         return self._filename, self._buffer
+    def close(self) -> None:
+        if self._buffer is not None:
+            self._buffer.close()
 
 class Wrap7Z:
 
     @staticmethod
     def _read_one(sz :py7zr.SevenZipFile, fn :str, occurrence :Optional[int] = None) -> BytesIO:
         """Read one file from a 7z archive as a BytesIO object."""
-        fact = SingleBytesIOFactory(occurrence)
-        sz.reset()
-        sz.extract(targets=[str(fn)], factory=fact)
-        try:
-            return fact.get()[1]
-        except FileNotFoundError:  # the getter doesn't know the filename, so replace the exception
-            raise FileNotFoundError(f"failed to extract {fn}")  # pylint: disable=raise-missing-from
+        with ExitStack() as stack:
+            fact = SingleBytesIOFactory(occurrence)
+            stack.callback(fact.close)
+            sz.reset()
+            sz.extract(targets=[str(fn)], factory=fact)
+            try:
+                bio = fact.get()[1]
+            except FileNotFoundError:  # the getter doesn't know the filename, so replace the exception
+                raise FileNotFoundError(f"failed to extract {fn}")  # pylint: disable=raise-missing-from
+            # The caller takes ownership only after extraction has succeeded.
+            stack.pop_all()
+            return bio
 
     @staticmethod
     def recursive_open(a :RecursiveOpenArgs, recurse :RecursiveOpener) -> Generator[IO[bytes], None, None]:
         with py7zr.SevenZipFile(cast(BinaryIO, a.fh)) as sz:
-            with recurse(RecursiveOpenArgs(fns=a.fns[1:], fh=Wrap7Z._read_one(sz, str(a.fns[1])))) as inner:
-                yield inner
+            with Wrap7Z._read_one(sz, str(a.fns[1])) as bio:
+                with recurse(RecursiveOpenArgs(fns=a.fns[1:], fh=bio)) as inner:
+                    yield inner
 
     @staticmethod
     def process_7z(a :FileProcessorArgs, recurse :FileProcessor) -> Generator[UnzipWalkResult, None, None]:
@@ -118,8 +128,9 @@ class Wrap7Z:
                                 raise
                             yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.ERROR)
                         else:
-                            yield from recurse(FileProcessorArgs(
-                                fns=new_names, raw_names=new_raw, fh=bio, size=f7.uncompressed, ctx=a.ctx))
+                            with bio:
+                                yield from recurse(FileProcessorArgs(
+                                    fns=new_names, raw_names=new_raw, fh=bio, size=f7.uncompressed, ctx=a.ctx))
         except Exception:  # pylint: disable=[duplicate-code]
             if a.ctx.raise_errors:
                 raise

@@ -29,7 +29,8 @@ import errno
 import doctest
 import unittest
 from hashlib import sha1
-from collections.abc import Sequence
+from collections.abc import Sequence, Generator
+from contextlib import contextmanager, closing, ExitStack, nullcontext
 from tarfile import TarError
 from zipfile import BadZipFile
 from unittest.mock import patch
@@ -43,7 +44,17 @@ import unzipwalk as uut
 from unzipwalk import FileType
 from .defs import EXPECT, EXPECT_7Z, BAD_ZIPS, ExpectedResult, TestCaseContext, r2e
 
-# spell: ignore strerror
+# spell: ignore strerror blabla
+
+@contextmanager
+def capture_7z_buffers() -> Generator[list[io.BytesIO], None, None]:
+    buffers :list[io.BytesIO] = []
+    def new_buffer() -> io.BytesIO:
+        buffer = io.BytesIO()
+        buffers.append(buffer)
+        return buffer
+    with patch('unzipwalk.wrap7z.BytesIO', side_effect=new_buffer):
+        yield buffers
 
 def load_tests(_loader :unittest.TestLoader, tests :unittest.TestSuite, _ignore :str|None) -> unittest.TestSuite:
     globs :dict[str, str] = {}
@@ -364,6 +375,62 @@ class TestUnzipWalk(unittest.TestCase):
                             ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )
             finally:
                 blocked.chmod(0o700)
+
+    def test_7z_walk_handle_lifetime(self) -> None:
+        with TestCaseContext():
+            for archive in ('opt.7z', 'more.zip'):
+                for mode in ('complete', 'close', 'exception'):
+                    with self.subTest(archive=archive, mode=mode), capture_7z_buffers() as buffers:
+                        handles :list[uut.ReadOnlyBinary] = []
+                        with closing(uut.unzipwalk(archive)) as walk:
+                            for result in walk:
+                                self.assertTrue(all(h.closed for h in handles))
+                                if result.hnd is not None:
+                                    self.assertFalse(result.hnd.closed)
+                                    result.hnd.read()
+                                    handles.append(result.hnd)
+                                    if mode!='complete' and any(n.lower().endswith('.7z') for n in result.raw_names[:-1]):
+                                        if mode=='exception':
+                                            with self.assertRaisesRegex(RuntimeError, 'consumer failure'):
+                                                walk.throw(RuntimeError('consumer failure'))
+                                        break
+                        self.assertTrue(buffers)
+                        self.assertTrue(handles)
+                        self.assertTrue(all(h.closed for h in handles))
+                        self.assertTrue(all(b.closed for b in buffers))
+
+    def test_7z_recursive_open_handle_lifetime(self) -> None:
+        with TestCaseContext():
+            for names, expected in (
+                    (('opt.7z', 'thing/blah.txt'), b'blabla\n'),
+                    (('opt.7z', 'thing/wuv.tgz', 'uvw.txt'), b'This\nis\na\n7z\ntest\n'),
+                    (('more.zip', 'more/stuff/xyz.7z', 'even.txt'), b'Adding') ):
+                for fail in (False, True):
+                    with self.subTest(names=names, fail=fail), capture_7z_buffers() as buffers:
+                        with self.assertRaisesRegex(RuntimeError, 'consumer failure') if fail else nullcontext():
+                            with uut.recursive_open(names) as fh:
+                                self.assertFalse(fh.closed)
+                                self.assertEqual(fh.read(), expected)
+                                self.assertTrue(buffers)
+                                self.assertTrue(all(not b.closed for b in buffers))
+                                if fail:
+                                    raise RuntimeError('consumer failure')
+                        self.assertTrue(fh.closed)
+                        self.assertTrue(all(b.closed for b in buffers))
+            with capture_7z_buffers() as buffers, self.assertRaises(KeyError), ExitStack() as stack:
+                stack.enter_context(uut.recursive_open(('opt.7z', 'thing/wuv.tgz', 'missing.txt')))
+            self.assertTrue(buffers)
+            self.assertTrue(all(b.closed for b in buffers))
+
+    def test_7z_extraction_error_cleanup(self) -> None:
+        for archive, member, error in (
+                (BAD_ZIPS/'bad.7z', 'broken.txt', ArchiveError),
+                (BAD_ZIPS/'double.7z', 'bar.txt', FileExistsError) ):
+            with self.subTest(archive=archive), capture_7z_buffers() as buffers:
+                with self.assertRaises(error), ExitStack() as stack:
+                    stack.enter_context(uut.recursive_open((archive, member)))
+                self.assertTrue(buffers)
+                self.assertTrue(all(b.closed for b in buffers))
 
     def test_wrap7z(self) -> None:
         from unzipwalk.wrap7z import Py7zBytesIO, SingleBytesIOFactory  # pylint: disable=import-outside-toplevel

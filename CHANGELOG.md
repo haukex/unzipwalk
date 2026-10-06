@@ -22,6 +22,8 @@ Changelog for unzipwalk
 - `from_checksum_line` now defaults to the current platform's pathname format. Its `windows`
   argument affects the physical pathname and derived compression paths.
 - Duplicate names in 7z archives are now yielded as separate results with their individual contents.
+- Extracted 7z member buffers are now closed when iteration advances or is closed, and when
+  `recursive_open` exits, including error paths.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------
