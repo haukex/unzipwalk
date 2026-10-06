@@ -36,7 +36,7 @@ from pathlib import Path, PurePosixPath, PurePath, PureWindowsPath
 from unzipwalk import FileType
 import unzipwalk as uut
 
-# spell: ignore fspath
+# spell: ignore fspath noname
 
 class LiteralArchiveName(os.PathLike[str]):
     def __init__(self, name :str) -> None:
@@ -202,7 +202,8 @@ class TestRawNames(unittest.TestCase):
             for ext, compress in (('gz', gzip_compress), ('bz2', bz2_compress), ('xz', lzma_compress)):
                 with self.subTest(ext=ext):
                     members = ((f"./dir//file.txt.{ext.upper()}", './dir//file.txt'),
-                        (f"dir\\.{ext}", 'dir\\'), (f"..{ext}", '.'))
+                        (f"dir\\.{ext}", 'dir\\'), (f"..{ext}", '.'), (f".{ext}", 'noname'),
+                        (f"./dir//.{ext.upper()}", './dir//noname'))
                     data = compress(b'contents')
                     with TarFile.open(fn, 'w') as tf:
                         for name, _ in members:
@@ -221,6 +222,28 @@ class TestRawNames(unittest.TestCase):
                     for name, derived in members:
                         with self.subTest(name=name):
                             with uut.recursive_open((fn, name, derived)) as fh:
+                                self.assertEqual(fh.read(), b'contents')
+
+    def test_suffix_only_compression(self) -> None:
+        with TemporaryDirectory() as td:
+            for ext, compress in (('gz', gzip_compress), ('bz2', bz2_compress), ('xz', lzma_compress)):
+                for depth in (1, 2):
+                    with self.subTest(ext=ext, depth=depth):
+                        fn = Path(td)/(('.'+ext)*depth)
+                        data = b'contents'
+                        for _ in range(depth):
+                            data = compress(data)
+                        fn.write_bytes(data)
+                        names = (str(fn), *(os.path.join(td, ('.'+ext)*i) for i in range(depth-1, 0, -1)),
+                            os.path.join(td, 'noname'))
+                        results = [(r.names, r.raw_names, r.typ, r.hnd.read() if r.hnd is not None else None)
+                            for r in uut.unzipwalk(fn)]
+                        self.assertEqual(results, [
+                            (tuple(Path(n) for n in names), names, FileType.FILE, b'contents'),
+                            *((tuple(Path(n) for n in names[:i]), names[:i], FileType.ARCHIVE, None)
+                                for i in range(depth, 0, -1)) ])
+                        for reopen_names in (results[0][0], results[0][1]):
+                            with uut.recursive_open(reopen_names) as fh:
                                 self.assertEqual(fh.read(), b'contents')
 
     def test_physical_compression_suffixes(self) -> None:

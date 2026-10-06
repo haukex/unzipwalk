@@ -61,6 +61,8 @@ For example, to read all CSV files in the current directory and below, including
 .. note::
     The original names of files compressed with gzip, bzip2, and lzma are derived by
     simply removing the respective ``.gz``, ``.bz2``, or ``.xz`` extensions.
+    If the filename consists only of the extension (for example ``.gz``), the derived
+    basename is ``noname``, preserving any directory prefix.
 
     Using the original filename from the gzip file's header is currently not possible due to
     `limitations in the underlying library <https://github.com/python/cpython/issues/71638>`_.
@@ -135,7 +137,7 @@ from igbpyutils.file import AnyPaths, to_Paths, Filename
 from .defs import (FileType, UnzipWalkResult, ReadOnlyBinary, FilterType, FileProcessorArgs, ProcessCallContext, RecursiveOpenArgs,
     convert_names as _conv_names, compression_stem as _cpr_stem, TARFILE_RE)
 
-# spell-checker: ignore autoclass autofunction clidoc seealso undoc fspath
+# spell-checker: ignore autoclass autofunction clidoc seealso undoc fspath noname
 
 __all__ = ['FileType', 'UnzipWalkResult', 'ReadOnlyBinary', 'FilterType', 'recursive_open', 'unzipwalk']
 

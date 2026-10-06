@@ -31,7 +31,7 @@ import unzipwalk.defs as uut
 from unzipwalk.defs import FileType
 from .defs import EXPECT, EXPECT_7Z
 
-# spell: ignore fspath
+# spell: ignore fspath noname
 
 class TestDefs(unittest.TestCase):
 
@@ -87,7 +87,9 @@ class TestDefs(unittest.TestCase):
                 ('', ''), ('file', 'file'), ('file.txt.gz', 'file.txt'), ('file.txt.BZ2', 'file.txt'), ('file.txt.xz', 'file.txt'),
                 ('archive.tar.gz', 'archive.tar'), ('archive.zip.gz.bz2.xz', 'archive.zip.gz.bz2'),
                 ('./dir//file.txt.GZ', './dir//file.txt'), (r'dir\.gz', 'dir\\'), ('.hidden.gz', '.hidden'),
-                ('..gz', '.'), ('...bz2', '..'), ('.gz', '.gz'), ('.bz2', '.bz2'), ('.xz', '.xz'),
+                ('..gz', '.'), ('...bz2', '..'), ('.gz', 'noname'), ('.bz2', 'noname'), ('.xz', 'noname'),
+                ('.GZ', 'noname'), ('.BZ2', 'noname'), ('.XZ', 'noname'), ('.hidden', '.hidden'),
+                ('./dir//.gz', './dir//noname'), ('dir/.bz2', 'dir/noname'), ('dir/.xz', 'dir/noname'),
                 ('dir/file.gz/', 'dir/file.gz/'), ('dir/file.gz/.', 'dir/file.gz/.') ):
             with self.subTest(name=name):
                 result = uut.compression_stem(name)
@@ -95,7 +97,7 @@ class TestDefs(unittest.TestCase):
                 self.assertIs(type(result), str)
         for name, expected in (
                 ('./dir//file.txt.GZ', 'dir/file.txt'), (r'dir\.gz', 'dir\\'), ('dir/file.gz/', 'dir/file'),
-                ('..gz', '.'), ('.gz', '.gz'), ('.bz2', '.bz2'), ('.xz', '.xz') ):
+                ('..gz', '.'), ('.gz', 'noname'), ('.bz2', 'noname'), ('.xz', 'noname'), ('dir/.GZ', 'dir/noname') ):
             with self.subTest(posix_path=name):
                 result_path = uut.compression_stem(PurePosixPath(name))
                 self.assertEqual(result_path, PurePosixPath(expected))
@@ -104,9 +106,10 @@ class TestDefs(unittest.TestCase):
                 ('file', 'file'), ('file.txt.GZ', 'file.txt'), ('file.txt.bz2', 'file.txt'), ('file.txt.XZ', 'file.txt'),
                 (os.path.join('dir.with.dots', '.hidden.GZ'), os.path.join('dir.with.dots', '.hidden')),
                 (os.path.join('dir', '..gz'), os.path.join('dir', '.')),
-                (os.path.join('dir', '.gz'), os.path.join('dir', '.gz')),
-                (os.path.join('dir', '.bz2'), os.path.join('dir', '.bz2')),
-                (os.path.join('dir', '.xz'), os.path.join('dir', '.xz')) ):
+                (os.path.join('dir', '.gz'), os.path.join('dir', 'noname')),
+                (os.path.join('dir', '.bz2'), os.path.join('dir', 'noname')),
+                (os.path.join('dir', '.xz'), os.path.join('dir', 'noname')),
+                (os.path.join('dir', '.GZ'), os.path.join('dir', 'noname')) ):
             with self.subTest(physical_name=name):
                 result = uut.compression_stem(name, physical=True)
                 self.assertEqual(result, expected)

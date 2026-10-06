@@ -31,6 +31,8 @@ Changelog for unzipwalk
 - Returned binary handles are now annotated as `IO[bytes]` instead of `ReadOnlyBinary` so usage in
   iteration and `TextIOWrapper` work with type checkers.
   `ReadOnlyBinary` remains the runtime validation protocol and now includes iteration.
+- Fixed infinite recursion for files named exactly `.gz`, `.bz2`, or `.xz`: their derived
+  basename is now `noname`, preserving any directory prefix.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------

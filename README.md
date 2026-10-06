@@ -64,6 +64,8 @@ For example, to read all CSV files in the current directory and below, including
 #### NOTE
 The original names of files compressed with gzip, bzip2, and lzma are derived by
 simply removing the respective `.gz`, `.bz2`, or `.xz` extensions.
+If the filename consists only of the extension (for example `.gz`), the derived
+basename is `noname`, preserving any directory prefix.
 
 Using the original filename from the gzip file’s header is currently not possible due to
 [limitations in the underlying library](https://github.com/python/cpython/issues/71638).
@@ -142,8 +144,9 @@ you can use [`raw_names`](#unzipwalk.UnzipWalkResult.raw_names) to access the ex
 #### raw_names *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
 
 The filename sequence as strings, preserving archive member names exactly as reported by the archive library (though
-for gzip, bzip2, and lzma files, the extension is simply removed). Pass this sequence to [`recursive_open()`](#unzipwalk.recursive_open) to avoid
-path normalization. This field must have the same number of elements as [`names`](#unzipwalk.UnzipWalkResult.names).
+for gzip, bzip2, and lzma files, the extension is removed and an extension-only basename becomes `noname`).
+Pass this sequence to [`recursive_open()`](#unzipwalk.recursive_open) to avoid path normalization.
+This field must have the same number of elements as [`names`](#unzipwalk.UnzipWalkResult.names).
 
 #### typ *: [FileType](#unzipwalk.FileType)*
 

@@ -35,7 +35,7 @@ from typing import Optional, Protocol, NamedTuple, runtime_checkable, IO, Union,
 from igbpyutils.file import Filename
 from .utils import decode_tuple
 
-# spell: ignore fspath
+# spell: ignore fspath noname
 
 class FileType(enum.IntEnum):
     """Used in :class:`UnzipWalkResult` to indicate the type of the file.
@@ -116,13 +116,21 @@ def compression_stem(name :str, *, physical :bool = False) -> str: ...
 @overload
 def compression_stem(name :PurePath, *, physical :bool = False) -> PurePath: ...
 def compression_stem(name :Union[str, PurePath], *, physical :bool = False) -> Union[str, PurePath]:
-    """Remove a compression suffix, preserving literal strings and the flavor of normalized path objects."""
+    """Remove a compression suffix, using ``noname`` for an extension-only basename.
+
+    Preserve literal strings and the flavor of normalized path objects.
+    """
     path = os.path if physical or isinstance(name, Path) else posixpath
     filename = os.fspath(name)
     stem, suffix = path.splitext(filename)
-    # splitext ignores all leading dots; preserve suffix removal for names such as '..gz'.
-    if not suffix and path.basename(filename).rfind('.') > 0:
-        stem = filename[:filename.rfind('.')]
+    # splitext ignores all leading dots. An extension-only name needs a synthetic basename
+    # so recursion advances; names such as '..gz' retain their existing suffix removal.
+    if not suffix:
+        basename = path.basename(filename)
+        if basename.lower() in ('.gz', '.bz2', '.xz'):
+            stem = filename[:-len(basename)]+'noname'
+        elif basename.rfind('.') > 0:
+            stem = filename[:filename.rfind('.')]
     return type(name)(stem) if isinstance(name, PurePath) else stem
 
 class UnzipWalkResult(NamedTuple):
@@ -134,8 +142,9 @@ class UnzipWalkResult(NamedTuple):
     #: you can use :attr:`raw_names` to access the exact archive member names, for example for use in :func:`recursive_open`.
     names :tuple[PurePath, ...]
     #: The filename sequence as strings, preserving archive member names exactly as reported by the archive library (though
-    #: for gzip, bzip2, and lzma files, the extension is simply removed). Pass this sequence to :func:`recursive_open` to avoid
-    #: path normalization. This field must have the same number of elements as :attr:`names`.
+    #: for gzip, bzip2, and lzma files, the extension is removed and an extension-only basename becomes ``noname``).
+    #: Pass this sequence to :func:`recursive_open` to avoid path normalization.
+    #: This field must have the same number of elements as :attr:`names`.
     raw_names :tuple[str, ...]
     #: A :class:`FileType` value representing the type of the current file.
     typ :FileType
