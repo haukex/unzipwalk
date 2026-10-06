@@ -356,7 +356,7 @@ directory components. For archive members, this is the path within the
 innermost archive. For more control, use the library instead of this command-
 line tool. ** Possible values for ALGO: blake2b, blake2s, md5, md5-sha1,
 ripemd160, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384,
-sha3_512, sha512, sha512_224, sha512_256, shake_128, shake_256, sm3
+sha3_512, sha512, sha512_224, sha512_256, sm3
 ```
 
 The available checksum algorithms may vary depending on your system and Python version.

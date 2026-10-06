@@ -33,15 +33,17 @@ import igbpyutils.error
 from . import unzipwalk, FileType
 
 def _arg_parser() -> argparse.ArgumentParser:
+    # exclude hash algorithms that are variable length (their .hexdigest requires a length argument that we don't provide)
+    algorithms = sorted(hashlib.algorithms_available - {'shake_128', 'shake_256'})
     parser = argparse.ArgumentParser('unzipwalk', description='Recursively walk into directories and archives',
         epilog="* Note --exclude matches the full final name in the sequence, including directory components. "
         "For archive members, this is the path within the innermost archive. "
         "For more control, use the library instead of this command-line tool.\n\n"
-        f"** Possible values for ALGO: {', '.join(sorted(hashlib.algorithms_available))}")
+        f"** Possible values for ALGO: {', '.join(algorithms)}")
     parser.add_argument('-a','--all-files', help="also list dirs, symlinks, etc.", action="store_true")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-d','--dump', help="also dump file contents", action="store_true")
-    group.add_argument('-c','--checksum', help="generate a checksum for each file**", choices=hashlib.algorithms_available, metavar="ALGO")
+    group.add_argument('-c','--checksum', help="generate a checksum for each file**", choices=algorithms, metavar="ALGO")
     parser.add_argument('-e', '--exclude', help="filename globs to exclude*", action="append", default=[])
     parser.add_argument('-r', '--raise-errors', help="raise errors instead of reporting them in output", action="store_true")
     parser.add_argument('-o', '--outfile', help="output filename (must not already exist)")
