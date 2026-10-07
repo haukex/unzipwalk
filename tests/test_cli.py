@@ -169,8 +169,9 @@ class TestUnzipWalkCli(unittest.TestCase):
                     f"{link_type.name} {('dangling.txt',)!r}",
                     "SKIP ('output.txt',)" ]))
 
-    @unittest.skipIf(condition = os.name!='posix', reason='only on POSIX')
-    def test_cli_checksum_undecodable_filename(self) -> None:  # cover-only-posix
+    # macOS rejects invalid UTF-8 filenames, so this physical-file test cannot run there.
+    @unittest.skipIf(condition = os.name!='posix' or sys.platform=='darwin', reason='requires POSIX with non-UTF-8 filenames')
+    def test_cli_checksum_undecodable_filename(self) -> None:  # cover-only-posix  # cover-not-darwin
         name = 'invalid-\udcff.txt'
         for options in ([], ['--raise-errors']):
             with self.subTest(options=options), TemporaryDirectory() as td, Pushd(td):
