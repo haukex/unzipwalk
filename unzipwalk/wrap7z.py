@@ -170,9 +170,17 @@ class Wrap7Z:
                         if str(i) not in factory.writers or not factory.writers[str(i)].complete:
                             yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.ERROR)
                         else:
-                            with open(factory.directory/str(i), 'rb') as fh:
-                                yield from recurse(FileProcessorArgs(
-                                    fns=new_names, raw_names=new_raw, fh=fh, size=f7.uncompressed, ctx=a.ctx))
+                            try:
+                                with open(factory.directory/str(i), 'rb') as fh:
+                                    yield from recurse(FileProcessorArgs(
+                                        fns=new_names, raw_names=new_raw, fh=fh, size=f7.uncompressed, ctx=a.ctx))
+                            # Keep the per-member recovery policy consistent with the ZIP and tar handlers.
+                            # pylint: disable=duplicate-code
+                            except Exception:
+                                if a.ctx.raise_errors:
+                                    raise
+                                yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.ERROR)
+                            # pylint: enable=duplicate-code
                     else:
                         yield UnzipWalkResult(names=new_names, raw_names=new_raw, typ=FileType.OTHER)
         except Exception:  # pylint: disable=[duplicate-code]

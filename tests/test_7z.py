@@ -27,8 +27,8 @@ import io
 import unittest
 from pathlib import Path
 from typing import IO, Literal
-from unittest.mock import patch
 from collections.abc import Generator
+from unittest.mock import DEFAULT, patch
 from contextlib import contextmanager, closing, ExitStack, nullcontext
 from py7zr.exceptions import ArchiveError
 from igbpyutils.file import Filename
@@ -137,6 +137,26 @@ class TestSevenZip(unittest.TestCase):
         self.assertCountEqual([(r.raw_names, r.typ, r.hnd.read() if r.hnd is not None else None)
             for r in uut.unzipwalk(archive, matcher=lambda names: names[-1]!='broken.txt')],
             [(names, FileType.SKIP if typ==FileType.ERROR else typ, data) for names, typ, data in expected])
+
+    def test_7z_member_access_error_recovery(self) -> None:
+        archive = Path(__file__).parent/'zips'/'opt.7z'
+        for raise_errors in (False, True):
+            error = PermissionError('injected member access error')
+            with self.subTest(raise_errors=raise_errors), patch('unzipwalk.wrap7z.open', create=True,
+                    wraps=open, side_effect=(error, DEFAULT)) as mock_open:
+                if raise_errors:
+                    with self.assertRaises(PermissionError) as caught:
+                        list(uut.unzipwalk(archive, raise_errors=raise_errors))
+                    self.assertIs(caught.exception, error)
+                else:
+                    self.assertCountEqual([(r.raw_names, r.typ, r.hnd.read() if r.hnd is not None else None)
+                        for r in uut.unzipwalk(archive, raise_errors=raise_errors)], [
+                        ((str(archive), 'thing'), FileType.DIR, None),
+                        ((str(archive), 'thing/blah.txt'), FileType.ERROR, None),
+                        ((str(archive), 'thing/wuv.tgz', 'uvw.txt'), FileType.FILE, b'This\nis\na\n7z\ntest\n'),
+                        ((str(archive), 'thing/wuv.tgz'), FileType.ARCHIVE, None),
+                        ((str(archive),), FileType.ARCHIVE, None) ])
+                self.assertEqual(mock_open.call_count, 1 if raise_errors else 2)
 
     def test_7z_member_types(self) -> None:
         archive = Path(__file__).parent/'member_types.7z'

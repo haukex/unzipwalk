@@ -36,8 +36,8 @@ Changelog for unzipwalk
     `recursive_open` exits, including error paths.
   - 7z symlinks and other special entries are now reported as `SYMLINK` and `OTHER`, respectively,
     instead of being processed as regular files.
-  - With `raise_errors=False`, unprocessed 7z members are retried after an extraction error,
-    allowing recovery of readable members in independent compression blocks.
+  - With `raise_errors=False`, the remaining members of archives containing errors can now be
+    processed.
 - Improved CLI `--outfile` handling: It can no longer clobber existing files, and if the output is
   in the input files, it is skipped automatically.
   Dangling symlinks no longer cause errors when comparing input paths with the output file,
