@@ -1,7 +1,7 @@
 Changelog for unzipwalk
 =======================
 
-2.0.0 - *not yet released*
+2.0.0 - Wed, Oct  7 2026
 ------------------------
 
 - **Possibly incompatible API change:** Added `UnzipWalkResult.raw_names` to preserve exact archive
