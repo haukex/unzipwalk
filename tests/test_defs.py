@@ -32,7 +32,7 @@ import unzipwalk.defs as uut
 from unzipwalk.defs import FileType
 from .defs import EXPECT, EXPECT_7Z
 
-# spell: ignore fspath noname
+# spell: ignore fspath noname udcff udfff
 
 class TestDefs(unittest.TestCase):
 
@@ -206,6 +206,26 @@ class TestDefs(unittest.TestCase):
                 self.assertEqual(decoded.names, file.fns)
                 self.assertEqual(decoded.raw_names, result.raw_names)
                 self.assertEqual(decoded.typ, result.typ)
+
+    def test_checksum_utf8_names(self) -> None:
+        for raw_names, typ in product(
+                (('file.txt',), ('caf\u00e9-\U0001f600.txt',), ('\ud800.txt',), ('invalid-\udcff.txt',), ('last-\udfff.txt',),
+                 ('archive.zip', 'member-\udcff.txt')),
+                (FileType.FILE, FileType.DIR)):
+            with self.subTest(raw_names=raw_names, typ=typ):
+                result = uut.UnzipWalkResult(names=tuple(PurePosixPath(n) for n in raw_names), raw_names=raw_names, typ=typ,
+                    hnd=io.BytesIO(b'abcdef') if typ==FileType.FILE else None)
+                line = result.checksum_line('md5')
+                decoded = uut.UnzipWalkResult.from_checksum_line(line.encode('UTF-8').decode('UTF-8'), windows=False)
+                assert decoded is not None
+                self.assertEqual(decoded.names, result.names)
+                self.assertEqual(decoded.raw_names, raw_names)
+                self.assertEqual(decoded.typ, typ)
+                if typ==FileType.FILE:
+                    assert decoded.hnd is not None
+                    self.assertEqual(decoded.hnd.read(), bytes.fromhex('e80b5017098950fc58aad83c8c14978e'))
+                else:
+                    self.assertIsNone(decoded.hnd)
 
     def test_checksum_line_endings(self) -> None:
         for raw_names, typ, ending, windows in product(

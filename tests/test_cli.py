@@ -36,10 +36,10 @@ from tempfile import TemporaryDirectory
 from contextlib import redirect_stdout, redirect_stderr
 from igbpyutils.file import Pushd
 import unzipwalk.__main__ as uut
-from unzipwalk import FileType
+from unzipwalk import FileType, UnzipWalkResult, recursive_open
 from .defs import BAD_ZIPS, TestCaseContext, ExpectedResult
 
-# spell-checker: ignore csha rcmd pushd
+# spell-checker: ignore csha rcmd pushd udcff
 
 class TestUnzipWalkCli(unittest.TestCase):
 
@@ -168,6 +168,24 @@ class TestUnzipWalkCli(unittest.TestCase):
                     "FILE ('input.txt',)",
                     f"{link_type.name} {('dangling.txt',)!r}",
                     "SKIP ('output.txt',)" ]))
+
+    @unittest.skipIf(condition = os.name!='posix', reason='only on POSIX')
+    def test_cli_checksum_undecodable_filename(self) -> None:  # cover-only-posix
+        name = 'invalid-\udcff.txt'
+        for options in ([], ['--raise-errors']):
+            with self.subTest(options=options), TemporaryDirectory() as td, Pushd(td):
+                Path(name).write_bytes(b'physical')
+                self.assertEqual(self._run_cli(['--checksum', 'sha256', '--outfile', 'output.txt', *options, name]), [])
+                line = Path('output.txt').read_text(encoding='UTF-8')
+                self.assertEqual(line, f"{hashlib.sha256(b'physical').hexdigest()} *{(name,)!r}\n")
+                decoded = UnzipWalkResult.from_checksum_line(line)
+                assert decoded is not None
+                self.assertEqual(decoded.raw_names, (name,))
+                self.assertEqual(os.fsencode(decoded.raw_names[0]), b'invalid-\xff.txt')
+                assert decoded.hnd is not None
+                self.assertEqual(decoded.hnd.read(), hashlib.sha256(b'physical').digest())
+                with recursive_open(decoded.raw_names) as fh:
+                    self.assertEqual(fh.read(), b'physical')
 
     def test_cli_errors(self) -> None:
         os.chdir(BAD_ZIPS)

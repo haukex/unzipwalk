@@ -35,7 +35,7 @@ from typing import Optional, Protocol, NamedTuple, runtime_checkable, IO, Union,
 from igbpyutils.file import Filename
 from .utils import decode_tuple
 
-# spell: ignore fspath noname
+# spell: ignore fspath noname udfff
 
 class FileType(enum.IntEnum):
     """Used in :class:`UnzipWalkResult` to indicate the type of the file.
@@ -199,7 +199,7 @@ class UnzipWalkResult(NamedTuple):
         """
         names = self.raw_names
         if len(names)==1 and names[0] and names[0].strip()==names[0] and not names[0].startswith('(') \
-                and '\n' not in names[0] and '\r' not in names[0]:  # pylint: disable=too-many-boolean-expressions
+                and not re.search(r'[\r\n\ud800-\udfff]', names[0]):
             name = names[0]
         else:
             name = repr(names)
