@@ -25,6 +25,7 @@ along with this program. If not, see https://www.gnu.org/licenses/
 import os
 import io
 import unittest
+from itertools import product
 from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from igbpyutils.file import Filename
 import unzipwalk.defs as uut
@@ -205,6 +206,38 @@ class TestDefs(unittest.TestCase):
                 self.assertEqual(decoded.names, file.fns)
                 self.assertEqual(decoded.raw_names, result.raw_names)
                 self.assertEqual(decoded.typ, result.typ)
+
+    def test_checksum_line_endings(self) -> None:
+        for raw_names, typ, ending, windows in product(
+                (('file.txt',), (r'C:\dir\file.txt',), (' file.txt \t',), ('file\r\n.txt',),
+                 ('archive.zip', './dir//file\r\n.txt')),
+                (FileType.FILE, FileType.DIR), ('', '\n', '\r\n'), (False, True)):
+            with self.subTest(raw_names=raw_names, typ=typ, ending=ending, windows=windows):
+                result = uut.UnzipWalkResult(
+                    names=((PureWindowsPath if windows else PurePosixPath)(raw_names[0]),
+                        *(PurePosixPath(name) for name in raw_names[1:])),
+                    raw_names=raw_names, typ=typ, hnd=io.BytesIO(b'abcdef') if typ==FileType.FILE else None)
+                decoded = uut.UnzipWalkResult.from_checksum_line(result.checksum_line('md5')+ending, windows=windows)
+                assert decoded is not None
+                self.assertEqual(decoded.raw_names, result.raw_names)
+                self.assertEqual(decoded.names, result.names)
+                self.assertEqual(decoded.typ, typ)
+                if typ==FileType.FILE:
+                    assert decoded.hnd is not None
+                    self.assertEqual(decoded.hnd.read(), bytes.fromhex('e80b5017098950fc58aad83c8c14978e'))
+                else:
+                    self.assertIsNone(decoded.hnd)
+
+    def test_checksum_line_whitespace(self) -> None:
+        for ending, windows in product(('', '\n', '\r\n'), (False, True)):
+            with self.subTest(ending=ending, windows=windows):
+                for line in ('', ' \t', '# user comment'):
+                    self.assertIsNone(uut.UnzipWalkResult.from_checksum_line(line+ending, windows=windows))
+                for line in ('00 * file.txt \t', '# DIR  file.txt \t'):
+                    with self.subTest(line=line):
+                        decoded = uut.UnzipWalkResult.from_checksum_line(line+ending, windows=windows)
+                        assert decoded is not None
+                        self.assertEqual(decoded.raw_names, (' file.txt \t',))
 
     def test_checksum_path_types(self) -> None:
         cases = [

@@ -229,12 +229,14 @@ class UnzipWalkResult(NamedTuple):
             the data from the file, instead it will be a handle to read the checksum of the file!
             (You could use :func:`recursive_open` to open the files themselves.)
 
-        :param line: The line to parse.
+        :param line: The line to parse, optionally ending with LF or CRLF on any platform.
         :param windows: Whether the physical pathname (and gzip, bzip2, or lzma paths derived from it) are in Windows format. Defaults
             to the current platform. Archive member names always use POSIX path objects, including any files nested inside archives.
         :return: The :class:`UnzipWalkResult` object, or :obj:`None` for empty or comment lines.
         :raises ValueError: If the line could not be parsed.
         """
+        # Remove only the line ending, preserving any whitespace in the filename.
+        line = line[:-2] if line.endswith('\r\n') else line.removesuffix('\n')
         if not line.strip():
             return None
         def mk_result(name :str, typ :FileType, hnd :Optional[IO[bytes]] = None) -> 'UnzipWalkResult':

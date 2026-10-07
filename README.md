@@ -208,7 +208,7 @@ the data from the file, instead it will be a handle to read the checksum of the 
 (You could use [`recursive_open()`](#unzipwalk.recursive_open) to open the files themselves.)
 
 * **Parameters:**
-  * **line** – The line to parse.
+  * **line** – The line to parse, optionally ending with LF or CRLF on any platform.
   * **windows** – Whether the physical pathname (and gzip, bzip2, or lzma paths derived from it) are in Windows format. Defaults
     to the current platform. Archive member names always use POSIX path objects, including any files nested inside archives.
 * **Returns:**

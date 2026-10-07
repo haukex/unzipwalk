@@ -40,6 +40,7 @@ Changelog for unzipwalk
   basename is now `noname`, preserving any directory prefix.
 - `from_checksum_line` now defaults to the current platform's pathname format. Its `windows`
   argument affects the physical pathname and derived compression paths.
+  Both LF and CRLF line endings are now accepted on all platforms.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------
