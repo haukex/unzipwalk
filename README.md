@@ -86,12 +86,16 @@ This generator recursively walks into directories and compressed files and yield
 
 * **Parameters:**
   * **paths** – A filename or iterable of filenames.
+    Symbolic links are reported as [`FileType.SYMLINK`](#unzipwalk.FileType) and are not followed,
+    including when supplied directly as input paths.
   * **matcher** – 
 
     When you provide this optional argument, it must be a callable that accepts a sequence of
     filename strings corresponding to [`raw_names`](#unzipwalk.UnzipWalkResult.raw_names) as its only argument, and returns
     a boolean value whether this filename should be further processed or not.
     If a file is skipped, a [`UnzipWalkResult`](#unzipwalk.UnzipWalkResult) of type [`FileType.SKIP`](#unzipwalk.FileType) is yielded.
+    Matching takes place before filesystem metadata is accessed, so excluded input paths can also
+    be missing or inaccessible.
 
     *Be aware* that within Zip and tar archives, all files are basically a flat list, so if your matcher
     excludes a directory inside an archive, it must also exclude all files within that directory as well.

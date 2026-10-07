@@ -64,6 +64,25 @@ class TestPermissions(unittest.TestCase):  # cover-only-posix
             finally:
                 blocked.chmod(0o700)
 
+    def test_excluded_inaccessible_input_paths(self) -> None:
+        with TemporaryDirectory() as td:
+            blocked = Path(td)/'blocked'
+            blocked.mkdir()
+            file = blocked/'file.txt'
+            file.write_bytes(b'hidden')
+            directory = blocked/'directory'
+            directory.mkdir()
+            blocked.chmod(0)
+            try:
+                for raise_errors in (False, True):
+                    with self.subTest(raise_errors=raise_errors):
+                        self.assertEqual(
+                            r2e(uut.unzipwalk((file, directory), matcher=lambda _names: False, raise_errors=raise_errors)),
+                            sorted([ExpectedResult((file,), None, FileType.SKIP, None),
+                                    ExpectedResult((directory,), None, FileType.SKIP, None) ]))
+            finally:
+                blocked.chmod(0o700)
+
     def test_unreadable_file(self) -> None:
         with TemporaryDirectory() as td:
             f = Path(td)/'foo'

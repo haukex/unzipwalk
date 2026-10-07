@@ -129,8 +129,8 @@ from gzip import GzipFile
 from lzma import LZMAFile
 from tarfile import TarFile
 from zipfile import ZipFile
-from contextlib import contextmanager
 from typing import Optional, cast, IO, Union
+from contextlib import closing, contextmanager
 from collections.abc import Generator, Sequence
 from pathlib import PurePosixPath, PurePath, Path
 from igbpyutils.file import AnyPaths, to_Paths, Filename
@@ -371,11 +371,15 @@ def unzipwalk(paths :AnyPaths,  # pylint: disable=too-many-locals
     """This generator recursively walks into directories and compressed files and yields named tuples of type :class:`UnzipWalkResult`.
 
     :param paths: A filename or iterable of filenames.
+        Symbolic links are reported as :class:`FileType.SYMLINK<FileType>` and are not followed,
+        including when supplied directly as input paths.
 
     :param matcher: When you provide this optional argument, it must be a callable that accepts a sequence of
         filename strings corresponding to :attr:`~UnzipWalkResult.raw_names` as its only argument, and returns
         a boolean value whether this filename should be further processed or not.
         If a file is skipped, a :class:`UnzipWalkResult` of type :class:`FileType.SKIP<FileType>` is yielded.
+        Matching takes place before filesystem metadata is accessed, so excluded input paths can also
+        be missing or inaccessible.
 
         *Be aware* that within Zip and tar archives, all files are basically a flat list, so if your matcher
         excludes a directory inside an archive, it must also exclude all files within that directory as well.
@@ -425,7 +429,7 @@ def unzipwalk(paths :AnyPaths,  # pylint: disable=too-many-locals
                                 ctx=ProcessCallContext(matcher=matcher, raise_errors=raise_errors))) )
                 else:
                     yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.OTHER).validate()  # cover-not-win32
-        except Exception:  # cover-only-posix  # e.g. PermissionError
+        except Exception:  # e.g. PermissionError
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.ERROR).validate()
@@ -440,17 +444,12 @@ def unzipwalk(paths :AnyPaths,  # pylint: disable=too-many-locals
             yield UnzipWalkResult(names=(name,), raw_names=(str(name),), typ=FileType.ERROR).validate()
         walk_errors.clear()
     for p in to_Paths(paths):
-        try:
-            is_dir = stat.S_ISDIR(p.resolve(strict=True).stat().st_mode)
-            if is_dir and matcher is not None and not matcher((str(p),)):
-                yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.SKIP).validate()
-                continue
-        except Exception:
-            if raise_errors:
-                raise
-            yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.ERROR).validate()
-        else:
-            if is_dir:
+        with closing(handle(p)) as results:
+            for result in results:
+                # Only a physical input directory starts a walk; directories inside archives are yielded normally.
+                if result.typ != FileType.DIR or result.names != (p,):
+                    yield result
+                    continue
                 for root, dirs, files in os.walk(p, onerror=walk_error):
                     r = Path(root)
                     yield from report_walk_errors(p)
@@ -467,5 +466,3 @@ def unzipwalk(paths :AnyPaths,  # pylint: disable=too-many-locals
                         yield from handle(r/fn)
                 # An error at the end of the walk may not be followed by another directory result.
                 yield from report_walk_errors(p)
-            else:
-                yield from handle(p)

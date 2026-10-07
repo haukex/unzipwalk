@@ -16,6 +16,10 @@ Changelog for unzipwalk
     of "uncommonly" named archive members.
 - Fixed physical directory exclusions in `matcher` and CLI `--exclude`: excluded directories are
   no longer descended into, including directories passed as input paths.
+- Input paths are now matched before filesystem metadata is accessed, so missing or inaccessible
+  excluded paths are reported as `SKIP` instead of causing errors.
+- Physical symlinks supplied as input paths are now reported as `SYMLINK` without following their
+  targets, including directory symlinks, dangling links, and cyclic links.
 - Improved handling of inaccessible files:
   - Directory traversal errors now respect `raise_errors`: they are raised by default, or when
     `raise_errors=False`, they are reported as `ERROR` results and traversal continues.

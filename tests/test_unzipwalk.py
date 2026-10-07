@@ -30,7 +30,7 @@ import unittest
 from hashlib import sha1
 from tarfile import TarError
 from zipfile import BadZipFile
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 from collections.abc import Sequence
 from tempfile import TemporaryDirectory
 from bz2 import compress as bz2_compress
@@ -169,6 +169,37 @@ class TestUnzipWalk(unittest.TestCase):
             self.assertEqual(
                 list( uut.unzipwalk(td/'excl', matcher=lambda p: os.path.basename(p[-1]) != 'excl') ),
                 [ uut.UnzipWalkResult(names=(td/'excl',), raw_names=(str(td/'excl'),), typ=FileType.SKIP) ])
+
+    def test_excluded_input_paths(self) -> None:
+        with TemporaryDirectory() as td:
+            missing = Path(td)/'missing'
+            good = Path(td)/'good.txt'
+            good.write_bytes(b'good')
+            directory = Path(td)/'directory'
+            directory.mkdir()
+            for raise_errors in (False, True):
+                with self.subTest(raise_errors=raise_errors):
+                    matcher = Mock(side_effect=(False, True, True))
+                    self.assertEqual(r2e(uut.unzipwalk((missing, good, directory), matcher=matcher, raise_errors=raise_errors)), sorted([
+                        ExpectedResult((missing,), None, FileType.SKIP, None),
+                        ExpectedResult((good,), b'good', FileType.FILE, 4) ]))
+                    self.assertEqual(matcher.call_args_list, [call((str(p),)) for p in (missing, good, directory)])
+
+    @unittest.skipIf(condition = os.name!='posix', reason='only on POSIX')
+    def test_input_symlinks(self) -> None:  # cover-only-posix
+        with TemporaryDirectory() as td:
+            folder = Path(td)/'folder'
+            folder.mkdir()
+            good = folder/'good.txt'
+            good.write_bytes(b'good')
+            for link, target in (
+                    (Path(td)/'file_link', good), (Path(td)/'dir_link', folder),
+                    (Path(td)/'dangling_link', Path(td)/'missing'), (Path(td)/'loop_link', Path(td)/'loop_link')):
+                link.symlink_to(target, target_is_directory=target==folder)
+                for raise_errors in (False, True):
+                    with self.subTest(path=link, raise_errors=raise_errors):
+                        self.assertEqual(r2e(uut.unzipwalk(link, raise_errors=raise_errors)),
+                            [ExpectedResult((link,), None, FileType.SYMLINK, None)])
 
     def test_recursive_open(self) -> None:
         with TestCaseContext() as expect:
