@@ -130,9 +130,9 @@ from lzma import LZMAFile
 from tarfile import TarFile
 from zipfile import ZipFile
 from contextlib import contextmanager
-from pathlib import PurePosixPath, PurePath, Path
 from typing import Optional, cast, IO, Union
 from collections.abc import Generator, Sequence
+from pathlib import PurePosixPath, PurePath, Path
 from igbpyutils.file import AnyPaths, to_Paths, Filename
 from .defs import (FileType, UnzipWalkResult, ReadOnlyBinary, FilterType, FileProcessorArgs, ProcessCallContext, RecursiveOpenArgs,
     convert_names as _conv_names, compression_stem as _cpr_stem, TARFILE_RE)
@@ -167,7 +167,7 @@ def _inner_recur_open(a :RecursiveOpenArgs) -> Generator[IO[bytes], None, None]:
                 ef = tf.extractfile(tar_member)
                 if not ef:  # e.g. directory
                     raise FileNotFoundError(f"not a file? {a.fns[0:2]}")  # [0]=the current file, [1]=the file we're trying to open
-                #TODO Later: I'm not sure why the following two branch coverage exceptions are necessary on 3.14?
+                # The following two branch coverage exceptions appear to be necessary on 3.14? coverage bug?
                 with ef as fh2:
                     with _inner_recur_open(RecursiveOpenArgs(fns=a.fns[1:], fh=fh2)) as inner:  # pragma: no branch
                         yield inner
@@ -411,18 +411,21 @@ def unzipwalk(paths :AnyPaths,  # pylint: disable=too-many-locals
         try:
             if matcher is not None and not matcher((str(p),)):
                 yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.SKIP).validate()
-            elif p.is_symlink():
-                yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.SYMLINK).validate()  # cover-not-win32
-            elif p.is_dir():
-                yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.DIR).validate()
-            elif p.is_file():
-                with p.open('rb') as fh:
-                    yield from ( r.validate() for r in
-                        _proc_file(FileProcessorArgs(fns=(p,), raw_names=(str(p),), fh=fh, size=p.stat().st_size,
-                            ctx=ProcessCallContext(matcher=matcher, raise_errors=raise_errors))) )
             else:
-                yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.OTHER).validate()  # cover-not-win32
-        except Exception:  # cover-only-linux  # e.g. PermissionError
+                # Metadata errors must reach the handler; Python 3.14's Path.is_*() methods return False instead.
+                st = p.lstat()
+                if stat.S_ISLNK(st.st_mode):
+                    yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.SYMLINK).validate()  # cover-not-win32
+                elif stat.S_ISDIR(st.st_mode):
+                    yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.DIR).validate()
+                elif stat.S_ISREG(st.st_mode):
+                    with p.open('rb') as fh:
+                        yield from ( r.validate() for r in
+                            _proc_file(FileProcessorArgs(fns=(p,), raw_names=(str(p),), fh=fh, size=st.st_size,
+                                ctx=ProcessCallContext(matcher=matcher, raise_errors=raise_errors))) )
+                else:
+                    yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.OTHER).validate()  # cover-not-win32
+        except Exception:  # cover-only-posix  # e.g. PermissionError
             if raise_errors:
                 raise
             yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.ERROR).validate()
@@ -438,7 +441,7 @@ def unzipwalk(paths :AnyPaths,  # pylint: disable=too-many-locals
         walk_errors.clear()
     for p in to_Paths(paths):
         try:
-            is_dir = p.resolve(strict=True).is_dir()
+            is_dir = stat.S_ISDIR(p.resolve(strict=True).stat().st_mode)
             if is_dir and matcher is not None and not matcher((str(p),)):
                 yield UnzipWalkResult(names=(p,), raw_names=(str(p),), typ=FileType.SKIP).validate()
                 continue

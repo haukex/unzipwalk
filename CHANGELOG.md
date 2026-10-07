@@ -19,6 +19,8 @@ Changelog for unzipwalk
   no longer descended into, including directories passed as input paths.
 - Directory traversal errors now respect `raise_errors`: they are raised by default, or when
   `raise_errors=False`, they are reported as `ERROR` results and traversal continues.
+- File type detection now respects `raise_errors` on Python 3.14 instead of reporting
+  inaccessible filesystem entries as `OTHER`.
 - `from_checksum_line` now defaults to the current platform's pathname format. Its `windows`
   argument affects the physical pathname and derived compression paths.
 - Duplicate names in 7z archives are now yielded as separate results with their individual contents.

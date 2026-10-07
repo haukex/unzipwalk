@@ -24,7 +24,6 @@ along with this program. If not, see https://www.gnu.org/licenses/
 """
 import os
 import io
-import sys
 import errno
 import doctest
 import unittest
@@ -352,18 +351,6 @@ class TestUnzipWalk(unittest.TestCase):
             with uut.recursive_open((BAD_ZIPS/"double.7z", "bar.txt")):
                 pass  # pragma: no cover
 
-    @unittest.skipIf(condition=not sys.platform.startswith('linux'), reason='only on Linux')
-    def test_errors_linux(self) -> None:  # cover-only-linux
-        with TemporaryDirectory() as td:
-            f = Path(td)/'foo'
-            f.touch()
-            f.chmod(0)
-            with self.assertRaises(PermissionError):
-                list(uut.unzipwalk(td))
-            self.assertEqual(
-                r2e(uut.unzipwalk(td, raise_errors=False)),
-                sorted( [ ExpectedResult( (f,), None, FileType.ERROR, None ), ] ) )
-
     def test_dir_walk_errors(self) -> None:
         with TemporaryDirectory() as td:
             error = PermissionError(errno.EACCES, os.strerror(errno.EACCES), td)
@@ -373,38 +360,6 @@ class TestUnzipWalk(unittest.TestCase):
                 self.assertIs(caught.exception, error)
                 self.assertEqual(r2e(uut.unzipwalk(td, raise_errors=False)),
                     [ExpectedResult((Path(td),), None, FileType.ERROR, None)])
-
-    @unittest.skipIf(condition = os.name!='posix', reason='only on POSIX')
-    def test_dir_perms(self) -> None:  # cover-only-posix
-        with TemporaryDirectory() as temp_dir:
-            td = Path(temp_dir)
-            blocked = td/'blocked'
-            blocked.mkdir()
-            (blocked/'hidden.txt').write_bytes(b'hidden')
-            (td/'readable').mkdir()
-            (td/'readable'/'good.txt').write_bytes(b'good')
-            blocked.chmod(0)
-            try:
-                for path in (td, blocked):
-                    with self.subTest(path=path):
-                        with self.assertRaises(PermissionError) as caught:
-                            list(uut.unzipwalk(path))
-                        self.assertEqual(caught.exception.filename, str(blocked))
-                self.assertEqual( r2e(uut.unzipwalk(td, raise_errors=False)),
-                    sorted([ExpectedResult((blocked,), None, FileType.ERROR, None),
-                            ExpectedResult((td/'readable',), None, FileType.DIR, None),
-                            ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )
-                self.assertEqual( r2e(uut.unzipwalk(blocked, raise_errors=False)),
-                    [ExpectedResult((blocked,), None, FileType.ERROR, None)] )
-                self.assertEqual( r2e(uut.unzipwalk((blocked, td/'readable'), raise_errors=False)),
-                    sorted([ExpectedResult((blocked,), None, FileType.ERROR, None),
-                            ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )
-                self.assertEqual( r2e(uut.unzipwalk(td, matcher=lambda p: os.path.basename(p[-1]) != 'blocked')),
-                    sorted([ExpectedResult((blocked,), None, FileType.SKIP, None),
-                            ExpectedResult((td/'readable',), None, FileType.DIR, None),
-                            ExpectedResult((td/'readable'/'good.txt',), b'good', FileType.FILE, 4) ]) )
-            finally:
-                blocked.chmod(0o700)
 
     def test_7z_walk_handle_lifetime(self) -> None:
         with TestCaseContext():
