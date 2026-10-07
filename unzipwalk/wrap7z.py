@@ -104,7 +104,13 @@ class Wrap7Z:
             fact = SingleBytesIOFactory()
             stack.callback(fact.close)
             sz.reset()
-            sz.extract(targets=[str(fn)], factory=fact)
+            # Match literal names before giving the reader safe, unique extraction identifiers.
+            targets :list[str] = []
+            for i, member in enumerate(sz.files):
+                if member.filename==fn:
+                    targets.append(str(i))
+                member.file_properties()['filename'] = str(i)
+            sz.extract(targets=targets, factory=fact)
             try:
                 bio = fact.get()[1]
             except FileNotFoundError:  # the getter doesn't know the filename, so replace the exception

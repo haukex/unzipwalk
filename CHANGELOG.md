@@ -9,34 +9,37 @@ Changelog for unzipwalk
   This was necessary because `pathlib` objects, as they are used in `names`, do some basic
   normalization, for example if an archive has a member named exactly `./file.txt`, `pathlib`
   normalizes this to `file.txt`, and so `recursive_open` can no longer open it. `raw_names` is now
-  used in more places, such as in "matchers" and in the CLI.
+  used in several places, such as in "matchers" and in the CLI.
   - CLI `--exclude` now matches the full final raw name, including directory components, instead of
     only the basename. For archive members, this is the path within the innermost archive.
-  - `recursive_open` was overhauled in terms of its pathname handling in general.
-- Improved CLI `--outfile` handling: It can no longer clobber existing files, and if the output is
-  in the input files, it is skipped automatically.
+  - `recursive_open` was overhauled in terms of its pathname handling in general, allowing opening
+    of "uncommonly" named archive members.
 - Fixed physical directory exclusions in `matcher` and CLI `--exclude`: excluded directories are
   no longer descended into, including directories passed as input paths.
-- Directory traversal errors now respect `raise_errors`: they are raised by default, or when
-  `raise_errors=False`, they are reported as `ERROR` results and traversal continues.
-- File type detection now respects `raise_errors` on Python 3.14 instead of reporting
-  inaccessible filesystem entries as `OTHER`.
-- `from_checksum_line` now defaults to the current platform's pathname format. Its `windows`
-  argument affects the physical pathname and derived compression paths.
-- Duplicate names in 7z archives are now yielded as separate results with their individual contents.
-- Extracted 7z member buffers are now closed when iteration advances or is closed, and when
-  `recursive_open` exits, including error paths.
-- 7z symlinks and other special entries are now reported as `SYMLINK` and `OTHER`, respectively,
-  instead of being processed as regular files.
-- Walking 7z archives now extracts selected files in a single pass to temporary storage,
-  avoiding repeated decompression of earlier members in solid archives.
-- With `raise_errors=False`, unprocessed 7z members are retried after an extraction error,
-  allowing recovery of readable members in independent compression blocks.
+- Improved handling of inaccessible files:
+  - Directory traversal errors now respect `raise_errors`: they are raised by default, or when
+    `raise_errors=False`, they are reported as `ERROR` results and traversal continues.
+  - File type detection now respects `raise_errors` on Python 3.14 instead of reporting
+    inaccessible filesystem entries as `OTHER`.
 - Returned binary handles are now annotated as `IO[bytes]` instead of `ReadOnlyBinary` so usage in
   iteration and `TextIOWrapper` work with type checkers.
   `ReadOnlyBinary` remains the runtime validation protocol and now includes iteration.
+- Improvements to 7z handling:
+  - Walking 7z archives now extracts selected files in a single pass to temporary storage,
+    avoiding repeated decompression of earlier members in solid archives.
+  - Duplicate names in are now yielded as separate results with their individual contents.
+  - Extracted 7z member buffers are now closed when iteration advances or is closed, and when
+    `recursive_open` exits, including error paths.
+  - 7z symlinks and other special entries are now reported as `SYMLINK` and `OTHER`, respectively,
+    instead of being processed as regular files.
+  - With `raise_errors=False`, unprocessed 7z members are retried after an extraction error,
+    allowing recovery of readable members in independent compression blocks.
+- Improved CLI `--outfile` handling: It can no longer clobber existing files, and if the output is
+  in the input files, it is skipped automatically.
 - Fixed infinite recursion for files named exactly `.gz`, `.bz2`, or `.xz`: their derived
   basename is now `noname`, preserving any directory prefix.
+- `from_checksum_line` now defaults to the current platform's pathname format. Its `windows`
+  argument affects the physical pathname and derived compression paths.
 
 1.9.2 - Sat, Oct  3 2026
 ------------------------
@@ -141,4 +144,4 @@ Changelog for unzipwalk
     - The `onlyfiles` argument of the `unzipwalk` function was removed and its return type has changed!
     - The output of the `unzipwalk` command line-tool has changed!
 
-<!-- spell: ignore onlyfiles pathlib -->
+<!-- spell: ignore onlyfiles pathlib noname -->

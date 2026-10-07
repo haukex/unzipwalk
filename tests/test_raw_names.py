@@ -57,9 +57,12 @@ class TestRawNames(unittest.TestCase):
                             zf.writestr('file.txt', b'first')
                             with self.assertWarnsRegex(UserWarning, 'Duplicate name'):
                                 zf.writestr('file.txt', b'second')
+                            zf.writestr('../file.txt', b'parent')
+                            zf.writestr('C:/dir/file.txt', b'drive')
                     elif ext=='tar':
                         with TarFile.open(fn, 'w') as tf:
-                            for name, data in (('./file.txt', b'dotted'), ('file.txt', b'first'), ('file.txt', b'second')):
+                            for name, data in (('./file.txt', b'dotted'), ('file.txt', b'first'), ('file.txt', b'second'),
+                                    ('../file.txt', b'parent'), ('C:/dir/file.txt', b'drive')):
                                 ti = TarInfo(name)
                                 ti.size = len(data)
                                 tf.addfile(ti, io.BytesIO(data))
@@ -74,15 +77,21 @@ class TestRawNames(unittest.TestCase):
                     self.assertCountEqual(found, [
                         ((fn, PurePosixPath('file.txt')), (str(fn), './file.txt'), b'dotted'),
                         ((fn, PurePosixPath('file.txt')), (str(fn), 'file.txt'), b'first'),
-                        ((fn, PurePosixPath('file.txt')), (str(fn), 'file.txt'), b'second') ])
+                        ((fn, PurePosixPath('file.txt')), (str(fn), 'file.txt'), b'second'),
+                        ((fn, PurePosixPath('../file.txt')), (str(fn), '../file.txt'), b'parent'),
+                        ((fn, PurePosixPath('C:/dir/file.txt')), (str(fn), 'C:/dir/file.txt'), b'drive') ])
                     self.assertCountEqual([(r.raw_names, r.typ, r.hnd.read() if r.hnd is not None else None)
                         for r in uut.unzipwalk(fn, matcher=lambda names: names[-1]!='./file.txt')], [
                         ((str(fn), './file.txt'), FileType.SKIP, None),
                         ((str(fn), 'file.txt'), FileType.FILE, b'first'),
                         ((str(fn), 'file.txt'), FileType.FILE, b'second'),
+                        ((str(fn), '../file.txt'), FileType.FILE, b'parent'),
+                        ((str(fn), 'C:/dir/file.txt'), FileType.FILE, b'drive'),
                         ((str(fn),), FileType.ARCHIVE, None) ])
-                    with uut.recursive_open((fn, './file.txt')) as fh:
-                        self.assertEqual(fh.read(), b'dotted')
+                    for name, data in (('./file.txt', b'dotted'), ('../file.txt', b'parent'), ('C:/dir/file.txt', b'drive')):
+                        with self.subTest(member=name):
+                            with uut.recursive_open((fn, name)) as fh:
+                                self.assertEqual(fh.read(), data)
                     if ext!='7z':
                         with self.assertRaises(KeyError), ExitStack() as stack:
                             stack.enter_context(uut.recursive_open((fn, 'missing.txt')))
@@ -128,7 +137,7 @@ class TestRawNames(unittest.TestCase):
 
     def test_raw_7z_skipped_duplicate(self) -> None:
         fn = Path(__file__).parent/'raw_names.7z'
-        matches = iter((True, True, False, True))
+        matches = iter((True, True, False, True, True, True))
         found :list[tuple[tuple[str, ...], FileType, bytes|None]] = []
         for result in uut.unzipwalk(fn, matcher=lambda _p: next(matches)):
             found.append((result.raw_names, result.typ, result.hnd.read() if result.hnd is not None else None))
@@ -136,6 +145,8 @@ class TestRawNames(unittest.TestCase):
             ((str(fn), './file.txt'), FileType.FILE, b'dotted'),
             ((str(fn), 'file.txt'), FileType.SKIP, None),
             ((str(fn), 'file.txt'), FileType.FILE, b'second'),
+            ((str(fn), '../file.txt'), FileType.FILE, b'parent'),
+            ((str(fn), 'C:/dir/file.txt'), FileType.FILE, b'drive'),
             ((str(fn),), FileType.ARCHIVE, None) ])
 
     def test_tar_literal_trailing_slash(self) -> None:
