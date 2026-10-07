@@ -61,14 +61,18 @@ class SpoolWriter(Py7zBytesIO):
         self.complete = True
 
 class SpoolFactory(py7zr.io.WriterFactory):
-    def __init__(self, directory :Path, stack :ExitStack):
+    def __init__(self, directory :Path):
         self.directory = directory
-        self._stack = stack
+        self._stack = ExitStack()
         self.writers :dict[str, SpoolWriter] = {}
     def create(self, filename :str) -> py7zr.io.Py7zIO:
         writer = SpoolWriter(self._stack.enter_context((self.directory/filename).open('w+b')))
         self.writers[filename] = writer
         return writer
+    def extract(self, sz :py7zr.SevenZipFile, targets :list[str]) -> None:
+        # Close partial outputs after each attempt, while retaining the completion state of every member.
+        with self._stack:
+            sz.extract(targets=targets, factory=self)
 
 class SingleBytesIOFactory(py7zr.io.WriterFactory):  # pyright: ignore [reportUntypedBaseClass]
     def __init__(self) -> None:
@@ -126,21 +130,27 @@ class Wrap7Z:
                 accepted = [a.ctx.matcher is None or a.ctx.matcher((*a.raw_names, f7.filename)) for f7 in members]
                 targets = [str(i) for i, f7 in enumerate(members) if accepted[i] and f7.is_file]
                 # Keep member contents on disk, closing each write handle as extraction finishes.
-                # The stack also closes partial outputs after extraction errors, before any results are yielded.
-                with ExitStack() as stack:
-                    factory = SpoolFactory(Path(tmp_dir), stack)
+                factory = SpoolFactory(Path(tmp_dir))
+                if targets:
+                    # The writer API receives sanitized names. Give this reader's metadata unique internal names so
+                    # duplicate names and names like './file.txt' and 'file.txt' cannot collide during extraction.
+                    # The archive itself and the original names saved in `members` are unchanged.
+                    for i, member in enumerate(sz.files):
+                        member.file_properties()['filename'] = str(i)
+                try:
                     if targets:
-                        # The writer API receives sanitized names. Give this reader's metadata unique internal names so
-                        # duplicate names and names like './file.txt' and 'file.txt' cannot collide during extraction.
-                        # The archive itself and the original names saved in `members` are unchanged.
-                        for i, member in enumerate(sz.files):
-                            member.file_properties()['filename'] = str(i)
+                        factory.extract(sz, targets)
+                except Exception:
+                    if a.ctx.raise_errors:
+                        raise
+                    # Retry unprocessed members individually; independent compression blocks may still be readable.
+                    for target in (fn for fn in targets if fn not in factory.writers):
                         try:
-                            sz.extract(targets=targets, factory=factory)
+                            sz.reset()
+                            factory.extract(sz, [target])
                         except Exception:
-                            if a.ctx.raise_errors:
-                                raise
-                            # Completed members remain usable; incomplete or unprocessed members are reported below.
+                            # A failed retry must not prevent attempts at later members.
+                            pass
                 for i, f7 in enumerate(members):
                     new_names = (*a.fns, PurePosixPath(f7.filename))
                     new_raw = (*a.raw_names, f7.filename)
