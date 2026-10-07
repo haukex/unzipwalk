@@ -36,6 +36,8 @@ Changelog for unzipwalk
     allowing recovery of readable members in independent compression blocks.
 - Improved CLI `--outfile` handling: It can no longer clobber existing files, and if the output is
   in the input files, it is skipped automatically.
+  Dangling symlinks no longer cause errors when comparing input paths with the output file,
+  and can still be reported or excluded normally.
 - Fixed infinite recursion for files named exactly `.gz`, `.bz2`, or `.xz`: their derived
   basename is now `noname`, preserving any directory prefix.
 - `from_checksum_line` now defaults to the current platform's pathname format. Its `windows`

@@ -153,6 +153,22 @@ class TestUnzipWalkCli(unittest.TestCase):
                     Path('output.txt').unlink()
             self.assertEqual(self._run_cli(['--outfile', '-', 'input.txt']), ["FILE ('input.txt',)"])
 
+    @unittest.skipIf(condition = os.name!='posix', reason='only on POSIX')
+    def test_cli_outfile_dangling_symlink(self) -> None:  # cover-only-posix
+        for options, link_type in (
+                ([], FileType.SYMLINK),
+                (['--raise-errors'], FileType.SYMLINK),
+                (['--exclude', 'dangling.txt'], FileType.SKIP),
+                (['--raise-errors', '--exclude', 'dangling.txt'], FileType.SKIP)):
+            with self.subTest(options=options), TemporaryDirectory() as td, Pushd(td):
+                Path('input.txt').write_bytes(b'physical')
+                Path('dangling.txt').symlink_to('missing.txt')
+                self.assertEqual(self._run_cli(['--all-files', '--outfile', 'output.txt', *options, '.']), [])
+                self.assertEqual(sorted(Path('output.txt').read_text(encoding='UTF-8').splitlines()), sorted([
+                    "FILE ('input.txt',)",
+                    f"{link_type.name} {('dangling.txt',)!r}",
+                    "SKIP ('output.txt',)" ]))
+
     def test_cli_errors(self) -> None:
         os.chdir(BAD_ZIPS)
         self.assertEqual( self._run_cli(['-d','.','does_not_exist']), sorted( [

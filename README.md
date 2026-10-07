@@ -265,10 +265,13 @@ this function exists to allow you to open the returned files after the iteration
 However, this function will be less efficient that [`unzipwalk()`](#function-unzipwalk) if you’re opening
 multiple files inside of Zip or tar archives.
 
-<!-- note: If *any* of ``encoding``, ``errors``, or ``newline`` is specified, the returned
-file is wrapped in :class:`io.TextIOWrapper`! -->
-<!-- note: If the last file in the list of files is an archive file, then it won't be decompressed,
-instead you'll be able to read the archive's raw compressed data from the handle. -->
+#### NOTE
+If *any* of `encoding`, `errors`, or `newline` is specified, the returned
+file is wrapped in [`io.TextIOWrapper`](https://docs.python.org/3/library/io.html#io.TextIOWrapper)!
+
+#### NOTE
+If the last file in the list of files is an archive file, then it won’t be decompressed,
+instead you’ll be able to read the archive’s raw compressed data from the handle.
 
 #### NOTE
 Strings used as archive member names are matched literally, including `./` prefixes and repeated

@@ -221,10 +221,10 @@ def recursive_open(fns :Sequence[Filename], encoding :Optional[str] = None, erro
     However, this function will be less efficient that :func:`unzipwalk` if you're opening
     multiple files inside of Zip or tar archives.
 
-    .. note: If *any* of ``encoding``, ``errors``, or ``newline`` is specified, the returned
+    .. note:: If *any* of ``encoding``, ``errors``, or ``newline`` is specified, the returned
         file is wrapped in :class:`io.TextIOWrapper`!
 
-    .. note: If the last file in the list of files is an archive file, then it won't be decompressed,
+    .. note:: If the last file in the list of files is an archive file, then it won't be decompressed,
         instead you'll be able to read the archive's raw compressed data from the handle.
 
     .. note:: Strings used as archive member names are matched literally, including ``./`` prefixes and repeated

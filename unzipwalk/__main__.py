@@ -56,8 +56,12 @@ def main(argv :Sequence[str]|None = None) -> None:
     args = parser.parse_args(argv)
     outfile = args.outfile if args.outfile and args.outfile != '-' else None
     def matcher(names :Sequence[str]) -> bool:
-        if outfile is not None and len(names)==1 and os.path.samefile(names[0], outfile):
-            return False  # skip the output file if we're using one
+        if outfile is not None and len(names)==1:
+            try:
+                if os.path.samefile(names[0], outfile):
+                    return False  # skip the output file if we're using one
+            except OSError:  # cover-only-posix
+                pass  # defer access errors to the walker
         return not any( fnmatch(names[-1], pat) for pat in args.exclude )
     report = (FileType.FILE, FileType.ERROR)
     with open_out(args.outfile, mode='x') as fh:
