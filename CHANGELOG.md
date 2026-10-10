@@ -4,6 +4,8 @@ Changelog for unzipwalk
 2.0.0 - Wed, Oct  7 2026
 ------------------------
 
+`commit f38f54cd02541d2f65bc2a583a5696d1a62e1812`
+
 - **Possibly incompatible API change:** Added `UnzipWalkResult.raw_names` to preserve exact archive
   member names; `UnzipWalkResult` is therefore now a 5-tuple `(names, raw_names, typ, hnd, size)`.
   This was necessary because `pathlib` objects, as they are used in `names`, do some basic
@@ -13,7 +15,8 @@ Changelog for unzipwalk
   - CLI `--exclude` now matches the full final raw name, including directory components, instead of
     only the basename. For archive members, this is the path within the innermost archive.
   - `recursive_open` was overhauled in terms of its pathname handling in general, allowing opening
-    of "uncommonly" named archive members.
+    of "uncommonly" named archive members. (If more than one archive member has the *exact* same
+    name, it is still not supported to open a specific one of those members.)
 - Fixed physical directory exclusions in `matcher` and CLI `--exclude`: excluded directories are
   no longer descended into, including directories passed as input paths.
 - Input paths are now matched before filesystem metadata is accessed, so missing or inaccessible
@@ -31,7 +34,7 @@ Changelog for unzipwalk
 - Improvements to 7z handling:
   - Walking 7z archives now extracts selected files in a single pass to temporary storage,
     avoiding repeated decompression of earlier members in solid archives.
-  - Duplicate names in are now yielded as separate results with their individual contents.
+  - Duplicate names in archives are now yielded as separate results with their individual contents.
   - Extracted 7z member buffers are now closed when iteration advances or is closed, and when
     `recursive_open` exits, including error paths.
   - 7z symlinks and other special entries are now reported as `SYMLINK` and `OTHER`, respectively,
@@ -51,15 +54,21 @@ Changelog for unzipwalk
 1.9.2 - Sat, Oct  3 2026
 ------------------------
 
+`commit d634b6ee4c0b9616a6b8736e849b3b77a7cb4939`
+
 - Fixed an issue extracting 7z archives with more than one member.
 
 1.9.1 - Fri, Aug 28 2026
 ------------------------
 
+`commit 327d95d965f34df85284db0fbc361b86edc4fda8`
+
 - Added more type annotations and added `py.typed` marker
 
 1.9.0 - Thu, Aug 20 2026
 ------------------------
+
+`commit 48fe372a5db9628d41381330810071ce4824580f`
 
 - Added `unzipwalk.ARCHIVE_RE`
 - `recursive_open` now handles invalid arguments better
@@ -68,10 +77,14 @@ Changelog for unzipwalk
 1.8.1 - Sun, Nov 16 2025
 ------------------------
 
+`commit 36a0d0e1d0d41efa09a86154b877becf747afd75`
+
 - Just a rebuild of 1.8.0 with proper permissions in the `.tar.gz` release file.
 
 1.8.0 - Sun, Nov 16 2025
 ------------------------
+
+`commit 680a45485f6273a66bf4a386c4fbccd221bea48d`
 
 - **Removed** `ReadOnlyBinary.name`
 - **Added** `UnzipWalkResult.size`
@@ -83,11 +96,15 @@ Changelog for unzipwalk
 1.7.0 - Thu, Oct 31 2024
 ------------------------
 
+`commit 70de03bc4d7a85d397caead032c69f32b2a53cc3`
+
 - Added support for `.bz2`, `.xz`, and `.7z` files (the latter requires the module `py7zr` to be installed)
 - **Warning: Deprecated** `ReadOnlyBinary.name` property; will be removed in the next release.
 
 1.6.0 - Wed, Jun 19 2024
 ------------------------
+
+`commit 243afeab7ff21f5e96eee9986099a1dd331d19e4`
 
 - Added `--outfile` CLI option
 
